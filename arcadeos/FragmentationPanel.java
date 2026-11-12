@@ -26,6 +26,8 @@ public class FragmentationPanel extends JPanel {
 
         algoCombo = new JComboBox<>(new String[]{"First Fit", "Best Fit", "Worst Fit"});
         algoCombo.setFont(RetroTheme.RETRO_FONT);
+        algoCombo.setBackground(new Color(32, 24, 56));
+        algoCombo.setForeground(RetroTheme.TEXT_WHITE);
         ctrl.add(algoCombo);
 
         JLabel lblB = new JLabel("RAM Blocks (KB):");
@@ -65,7 +67,7 @@ public class FragmentationPanel extends JPanel {
 
         allocModel = new DefaultTableModel(new String[]{"Process #", "Process Size", "Allocated Block #", "Block Initial Size", "Internal Frag (Unused)"}, 0);
         JTable table = RetroTheme.createRetroTable(allocModel);
-        JScrollPane scroll = new JScrollPane(table);
+        JScrollPane scroll = RetroTheme.createRetroScroll(table);
         outPanel.add(scroll, BorderLayout.CENTER);
 
         add(outPanel, BorderLayout.CENTER);

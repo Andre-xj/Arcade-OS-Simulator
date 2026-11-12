@@ -36,7 +36,7 @@ public class SegmentationPanel extends JPanel {
 
         segModel = new DefaultTableModel(new String[]{"Segment #", "Segment Name", "Base Address", "Limit (Size)"}, 0);
         JTable table = RetroTheme.createRetroTable(segModel);
-        JScrollPane scroll = new JScrollPane(table);
+        JScrollPane scroll = RetroTheme.createRetroScroll(table);
         scroll.setBorder(BorderFactory.createTitledBorder(
                 BorderFactory.createLineBorder(RetroTheme.BORDER_COLOR), " [ SEGMENT TABLE ] ",
                 TitledBorder.LEFT, TitledBorder.TOP, RetroTheme.RETRO_FONT_BOLD, RetroTheme.ACCENT_CYAN
@@ -49,11 +49,17 @@ public class SegmentationPanel extends JPanel {
 
         JPanel inputs = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 8));
         inputs.setOpaque(false);
-        inputs.add(new JLabel("Seg #:"));
+        JLabel lblSeg = new JLabel("Seg #:");
+        lblSeg.setFont(RetroTheme.RETRO_FONT_BOLD);
+        lblSeg.setForeground(RetroTheme.ACCENT_CYAN);
+        inputs.add(lblSeg);
         txtSegNo = RetroTheme.createRetroTextField("1", 3);
         inputs.add(txtSegNo);
 
-        inputs.add(new JLabel("Offset:"));
+        JLabel lblOff = new JLabel("Offset:");
+        lblOff.setFont(RetroTheme.RETRO_FONT_BOLD);
+        lblOff.setForeground(RetroTheme.ACCENT_CYAN);
+        inputs.add(lblOff);
         txtOffset = RetroTheme.createRetroTextField("250", 5);
         inputs.add(txtOffset);
 
@@ -68,11 +74,11 @@ public class SegmentationPanel extends JPanel {
         transBox.add(lblResult, BorderLayout.CENTER);
 
         txtLog = new JTextArea();
-        txtLog.setBackground(new Color(10, 6, 18));
+        txtLog.setBackground(RetroTheme.INPUT_BG);
         txtLog.setForeground(RetroTheme.TEXT_WHITE);
         txtLog.setFont(RetroTheme.RETRO_FONT);
         txtLog.setEditable(false);
-        JScrollPane scrollLog = new JScrollPane(txtLog);
+        JScrollPane scrollLog = RetroTheme.createRetroScroll(txtLog);
         scrollLog.setPreferredSize(new Dimension(300, 200));
         transBox.add(scrollLog, BorderLayout.SOUTH);
 

@@ -47,7 +47,7 @@ public class MultiprogrammingPanel extends JPanel {
 
         procModel = new DefaultTableModel(new String[]{"Game / Program", "Mem Req (MB)", "CPU Share (%)", "State"}, 0);
         JTable table = RetroTheme.createRetroTable(procModel);
-        JScrollPane scroll = new JScrollPane(table);
+        JScrollPane scroll = RetroTheme.createRetroScroll(table);
         scroll.setBorder(BorderFactory.createTitledBorder(
                 BorderFactory.createLineBorder(RetroTheme.BORDER_COLOR), " [ CONCURRENT GAME INSTANCES ] ",
                 TitledBorder.LEFT, TitledBorder.TOP, RetroTheme.RETRO_FONT_BOLD, RetroTheme.ACCENT_CYAN
@@ -91,11 +91,11 @@ public class MultiprogrammingPanel extends JPanel {
         statPanel.add(lblStatus, BorderLayout.CENTER);
 
         txtLog = new JTextArea();
-        txtLog.setBackground(new Color(10, 6, 18));
+        txtLog.setBackground(RetroTheme.INPUT_BG);
         txtLog.setForeground(RetroTheme.TEXT_WHITE);
         txtLog.setFont(RetroTheme.RETRO_FONT);
         txtLog.setEditable(false);
-        JScrollPane scrollLog = new JScrollPane(txtLog);
+        JScrollPane scrollLog = RetroTheme.createRetroScroll(txtLog);
         scrollLog.setPreferredSize(new Dimension(300, 180));
         statPanel.add(scrollLog, BorderLayout.SOUTH);
 
@@ -183,7 +183,7 @@ public class MultiprogrammingPanel extends JPanel {
             lblStatus.setForeground(usedCPU > 100 ? RetroTheme.ACCENT_PINK : RetroTheme.ACCENT_CYAN);
             txtLog.setText(sb.toString());
         } catch (Exception ex) {
-            JOptionPane.showMessageDialog(this, "Error sa Multiprogramming inputs: " + ex.getMessage(), "Input Error", JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(this, "Multiprogramming Error: " + ex.getMessage(), "Input Error", JOptionPane.ERROR_MESSAGE);
         }
     }
 }

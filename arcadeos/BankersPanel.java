@@ -44,7 +44,7 @@ public class BankersPanel extends JPanel {
 
         tableModel = new DefaultTableModel(new String[]{"Process / Player ID", "Allocated Resources", "Max Claim Resources"}, 0);
         JTable table = RetroTheme.createRetroTable(tableModel);
-        JScrollPane scrollTable = new JScrollPane(table);
+        JScrollPane scrollTable = RetroTheme.createRetroScroll(table);
         scrollTable.setPreferredSize(new Dimension(800, 180));
 
         JPanel logPanel = new JPanel(new BorderLayout(4, 4));
@@ -57,11 +57,11 @@ public class BankersPanel extends JPanel {
         logPanel.add(lblStatus, BorderLayout.NORTH);
 
         txtTrace = new JTextArea();
-        txtTrace.setBackground(new Color(10, 6, 18));
+        txtTrace.setBackground(RetroTheme.INPUT_BG);
         txtTrace.setForeground(RetroTheme.TEXT_WHITE);
         txtTrace.setFont(RetroTheme.RETRO_FONT);
         txtTrace.setEditable(false);
-        JScrollPane scrollTrace = new JScrollPane(txtTrace);
+        JScrollPane scrollTrace = RetroTheme.createRetroScroll(txtTrace);
         logPanel.add(scrollTrace, BorderLayout.CENTER);
 
         JSplitPane split = new JSplitPane(JSplitPane.VERTICAL_SPLIT, scrollTable, logPanel);
@@ -110,7 +110,7 @@ public class BankersPanel extends JPanel {
             for (int j = 0; j < m; j++) avail[j] = Integer.parseInt(avTokens[j]);
 
             int n = tableModel.getRowCount();
-            if (n == 0) throw new Exception("Walang processes sa table!");
+            if (n == 0) throw new Exception("No processes in the table!");
 
             String[] pids = new String[n];
             int[][] alloc = new int[n][m];

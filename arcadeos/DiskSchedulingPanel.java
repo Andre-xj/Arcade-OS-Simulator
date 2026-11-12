@@ -30,6 +30,8 @@ public class DiskSchedulingPanel extends JPanel {
 
         algoCombo = new JComboBox<>(new String[]{"FCFS", "SSTF", "SCAN", "C-SCAN", "LOOK", "C-LOOK"});
         algoCombo.setFont(RetroTheme.RETRO_FONT);
+        algoCombo.setBackground(new Color(32, 24, 56));
+        algoCombo.setForeground(RetroTheme.TEXT_WHITE);
         ctrl.add(algoCombo);
 
         JLabel lblH = new JLabel("Init Head:");
@@ -55,6 +57,8 @@ public class DiskSchedulingPanel extends JPanel {
 
         dirCombo = new JComboBox<>(new String[]{"UP (High)", "DOWN (Low)"});
         dirCombo.setFont(RetroTheme.RETRO_FONT);
+        dirCombo.setBackground(new Color(32, 24, 56));
+        dirCombo.setForeground(RetroTheme.TEXT_WHITE);
         ctrl.add(dirCombo);
 
         JLabel lblR = new JLabel("Requests:");
@@ -89,16 +93,16 @@ public class DiskSchedulingPanel extends JPanel {
 
         outModel = new DefaultTableModel(new String[]{"Step", "From Cylinder", "To Cylinder", "Seek Distance"}, 0);
         JTable table = RetroTheme.createRetroTable(outModel);
-        JScrollPane scroll = new JScrollPane(table);
+        JScrollPane scroll = RetroTheme.createRetroScroll(table);
         leftOut.add(scroll, BorderLayout.CENTER);
         outPanel.add(leftOut);
 
         txtTrace = new JTextArea();
-        txtTrace.setBackground(new Color(10, 6, 18));
+        txtTrace.setBackground(RetroTheme.INPUT_BG);
         txtTrace.setForeground(RetroTheme.TEXT_WHITE);
         txtTrace.setFont(RetroTheme.RETRO_FONT);
         txtTrace.setEditable(false);
-        JScrollPane scrollLog = new JScrollPane(txtTrace);
+        JScrollPane scrollLog = RetroTheme.createRetroScroll(txtTrace);
         scrollLog.setBorder(BorderFactory.createTitledBorder(
                 BorderFactory.createLineBorder(RetroTheme.BORDER_COLOR), " [ DISK TRAVERSAL PATH ] ",
                 TitledBorder.LEFT, TitledBorder.TOP, RetroTheme.RETRO_FONT_BOLD, RetroTheme.ACCENT_CYAN

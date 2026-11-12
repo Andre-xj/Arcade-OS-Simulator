@@ -45,7 +45,7 @@ public class PagingPanel extends JPanel {
 
         pageTableModel = new DefaultTableModel(new String[]{"Logical Page #", "Physical Frame #"}, 0);
         JTable table = RetroTheme.createRetroTable(pageTableModel);
-        JScrollPane scroll = new JScrollPane(table);
+        JScrollPane scroll = RetroTheme.createRetroScroll(table);
         scroll.setBorder(BorderFactory.createTitledBorder(
                 BorderFactory.createLineBorder(RetroTheme.BORDER_COLOR), " [ PAGE-TO-FRAME MAP TABLE ] ",
                 TitledBorder.LEFT, TitledBorder.TOP, RetroTheme.RETRO_FONT_BOLD, RetroTheme.ACCENT_CYAN
@@ -77,11 +77,11 @@ public class PagingPanel extends JPanel {
         rightPanel.add(lblTranslateResult, BorderLayout.CENTER);
 
         txtPageInfo = new JTextArea();
-        txtPageInfo.setBackground(new Color(10, 6, 18));
+        txtPageInfo.setBackground(RetroTheme.INPUT_BG);
         txtPageInfo.setForeground(RetroTheme.TEXT_WHITE);
         txtPageInfo.setFont(RetroTheme.RETRO_FONT);
         txtPageInfo.setEditable(false);
-        JScrollPane scrollInfo = new JScrollPane(txtPageInfo);
+        JScrollPane scrollInfo = RetroTheme.createRetroScroll(txtPageInfo);
         scrollInfo.setPreferredSize(new Dimension(300, 200));
         rightPanel.add(scrollInfo, BorderLayout.SOUTH);
 

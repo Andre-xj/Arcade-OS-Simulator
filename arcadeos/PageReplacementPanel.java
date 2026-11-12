@@ -28,6 +28,8 @@ public class PageReplacementPanel extends JPanel {
 
         algoCombo = new JComboBox<>(new String[]{"FIFO", "LRU", "Optimal"});
         algoCombo.setFont(RetroTheme.RETRO_FONT);
+        algoCombo.setBackground(new Color(32, 24, 56));
+        algoCombo.setForeground(RetroTheme.TEXT_WHITE);
         ctrl.add(algoCombo);
 
         JLabel lblF = new JLabel("Frames:");
@@ -67,7 +69,7 @@ public class PageReplacementPanel extends JPanel {
 
         traceModel = new DefaultTableModel();
         JTable table = RetroTheme.createRetroTable(traceModel);
-        JScrollPane scroll = new JScrollPane(table);
+        JScrollPane scroll = RetroTheme.createRetroScroll(table);
         display.add(scroll, BorderLayout.CENTER);
 
         add(display, BorderLayout.CENTER);
