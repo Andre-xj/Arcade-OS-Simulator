@@ -9,20 +9,25 @@ import javax.swing.*;
 
 /**
  * Screen 2: MAIN MENU / AAA GAME-STYLE INTERFACE
- * Matches standard video game title menus (like Homefront / Cyberpunk):
- * - Full-bleed background wallpaper
- * - Left-side dark gradient vignette for crystal clear text readability
- * - Zero bulky boxes/cards, wide open right side to showcase the background art
- * - Vertical clean text menu with glowing active selection
- * - Bottom game prompts (PROFILE on left, CONTROLS on right)
+ * Modeled after Homefront: The Revolution main menu:
+ * - Full-bleed background wallpaper (bg.jpg) covering 100% of the panel
+ * - Heavy dark gradient vignette on the left ~45% for crystal clear text
+ * - Clean vertical text-only menu items (no cards, no boxes)
+ * - Subtle glowing pink indicator bar on the active selection
+ * - Bottom bar: PROFILE on left, keyboard prompts on right
+ * - Top bar: minimal ghost buttons in the upper-right
  */
 public class MainMenuPanel extends JPanel {
     private ArcadeOS parentFrame;
-    private int selectedMenuIndex = 0; // 0=Archives, 1=Quiz, 2=About, 3=Exit
+    private int selectedMenuIndex = 0;
     private Timer pulseTimer;
     private float pulseAlpha = 1.0f;
     private boolean pulseUp = false;
     private Image bgImage;
+
+    // Scrolling ticker offset
+    private float tickerOffset = 0;
+    private Timer tickerTimer;
 
     private final String[] menuTitles = {
         "SYSTEM ARCHIVES",
@@ -37,6 +42,8 @@ public class MainMenuPanel extends JPanel {
         "DEVELOPER CREDITS & SYSTEM ARCHITECTURE",
         "TERMINATE CURRENT KERNEL SESSION"
     };
+
+    private JPanel menuListPanel;
 
     public MainMenuPanel(ArcadeOS parent) {
         this.parentFrame = parent;
@@ -61,28 +68,32 @@ public class MainMenuPanel extends JPanel {
         addKeyListener(new KeyAdapter() {
             @Override
             public void keyPressed(KeyEvent e) {
-                if (e.getKeyCode() == KeyEvent.VK_UP) {
+                if (e.getKeyCode() == KeyEvent.VK_UP || e.getKeyCode() == KeyEvent.VK_W) {
                     selectedMenuIndex = (selectedMenuIndex - 1 + menuTitles.length) % menuTitles.length;
+                    updateMenuStyles();
                     repaint();
-                } else if (e.getKeyCode() == KeyEvent.VK_DOWN) {
+                } else if (e.getKeyCode() == KeyEvent.VK_DOWN || e.getKeyCode() == KeyEvent.VK_S) {
                     selectedMenuIndex = (selectedMenuIndex + 1) % menuTitles.length;
+                    updateMenuStyles();
                     repaint();
                 } else if (e.getKeyCode() == KeyEvent.VK_ENTER) {
                     triggerMenuAction(selectedMenuIndex);
+                } else if (e.getKeyCode() == KeyEvent.VK_ESCAPE) {
+                    confirmExit();
                 }
             }
         });
 
-        // Top mini toolbar
+        // Top mini toolbar (upper-right ghost buttons)
         add(createTopBar(), BorderLayout.NORTH);
 
-        // Center: Left-aligned game menu list (No cards, no boxes!)
+        // Center: Left-aligned game menu list
         add(createMenuArea(), BorderLayout.CENTER);
 
         // Bottom Bar: Profile on left, Controller prompts on right
         add(createBottomBar(), BorderLayout.SOUTH);
 
-        // Subtle pulse timer for selected item / prompt
+        // Subtle pulse timer for selected item glow
         pulseTimer = new Timer(50, e -> {
             if (pulseUp) {
                 pulseAlpha += 0.05f;
@@ -94,10 +105,18 @@ public class MainMenuPanel extends JPanel {
             repaint();
         });
         pulseTimer.start();
+
+        // Scrolling RSS-style ticker
+        tickerTimer = new Timer(40, e -> {
+            tickerOffset -= 1.2f;
+            if (tickerOffset < -900) tickerOffset = 0;
+            repaint();
+        });
+        tickerTimer.start();
     }
 
     private JPanel createTopBar() {
-        JPanel bar = new JPanel(new FlowLayout(FlowLayout.RIGHT, 12, 12));
+        JPanel bar = new JPanel(new FlowLayout(FlowLayout.RIGHT, 12, 10));
         bar.setOpaque(false);
 
         JButton btnSwitch = createMinimalTopButton("👤 SWITCH PLAYER");
@@ -118,12 +137,12 @@ public class MainMenuPanel extends JPanel {
     private JButton createMinimalTopButton(String text) {
         JButton btn = new JButton(text);
         btn.setFont(new Font("Consolas", Font.BOLD, 10));
-        btn.setForeground(new Color(220, 220, 240));
+        btn.setForeground(new Color(180, 180, 200, 180));
         btn.setFocusPainted(false);
         btn.setOpaque(false);
         btn.setContentAreaFilled(false);
         btn.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(new Color(255, 255, 255, 60), 1),
+                BorderFactory.createLineBorder(new Color(255, 255, 255, 35), 1),
                 BorderFactory.createEmptyBorder(5, 12, 5, 12)
         ));
         btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
@@ -132,15 +151,15 @@ public class MainMenuPanel extends JPanel {
             public void mouseEntered(MouseEvent e) {
                 btn.setForeground(RetroTheme.ACCENT_CYAN);
                 btn.setBorder(BorderFactory.createCompoundBorder(
-                        BorderFactory.createLineBorder(RetroTheme.ACCENT_CYAN, 1),
+                        BorderFactory.createLineBorder(new Color(5, 217, 232, 120), 1),
                         BorderFactory.createEmptyBorder(5, 12, 5, 12)
                 ));
             }
             @Override
             public void mouseExited(MouseEvent e) {
-                btn.setForeground(new Color(220, 220, 240));
+                btn.setForeground(new Color(180, 180, 200, 180));
                 btn.setBorder(BorderFactory.createCompoundBorder(
-                        BorderFactory.createLineBorder(new Color(255, 255, 255, 60), 1),
+                        BorderFactory.createLineBorder(new Color(255, 255, 255, 35), 1),
                         BorderFactory.createEmptyBorder(5, 12, 5, 12)
                 ));
             }
@@ -153,32 +172,36 @@ public class MainMenuPanel extends JPanel {
         JPanel container = new JPanel();
         container.setOpaque(false);
         container.setLayout(new BoxLayout(container, BoxLayout.Y_AXIS));
-        container.setBorder(BorderFactory.createEmptyBorder(30, 70, 20, 40));
+        container.setBorder(BorderFactory.createEmptyBorder(20, 70, 20, 40));
 
-        // 1. Small red/pink sub-tag (like in the reference photo)
+        // Push content down a bit from top
+        container.add(Box.createVerticalGlue());
+
+        // 1. Small red/pink sub-tag (like Homefront's Korean text)
         JLabel subTag = new JLabel("메인 메뉴 // ARCADE EDITION");
         subTag.setFont(new Font("Consolas", Font.BOLD, 11));
         subTag.setForeground(RetroTheme.ACCENT_PINK);
         subTag.setAlignmentX(Component.LEFT_ALIGNMENT);
         container.add(subTag);
 
-        container.add(Box.createVerticalStrut(4));
+        container.add(Box.createVerticalStrut(2));
 
         // 2. Huge Game Title: MINI // OS
         JPanel titleRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
         titleRow.setOpaque(false);
         titleRow.setAlignmentX(Component.LEFT_ALIGNMENT);
+        titleRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, 70));
 
         JLabel lblMini = new JLabel("MINI ");
-        lblMini.setFont(new Font("Consolas", Font.BOLD, 58));
+        lblMini.setFont(new Font("Consolas", Font.BOLD, 60));
         lblMini.setForeground(Color.WHITE);
 
         JLabel lblSlash = new JLabel("// ");
-        lblSlash.setFont(new Font("Consolas", Font.BOLD, 58));
+        lblSlash.setFont(new Font("Consolas", Font.BOLD, 60));
         lblSlash.setForeground(RetroTheme.ACCENT_PINK);
 
         JLabel lblOs = new JLabel("OS");
-        lblOs.setFont(new Font("Consolas", Font.BOLD, 58));
+        lblOs.setFont(new Font("Consolas", Font.BOLD, 60));
         lblOs.setForeground(Color.WHITE);
 
         titleRow.add(lblMini);
@@ -186,7 +209,7 @@ public class MainMenuPanel extends JPanel {
         titleRow.add(lblOs);
         container.add(titleRow);
 
-        container.add(Box.createVerticalStrut(4));
+        container.add(Box.createVerticalStrut(2));
 
         // 3. Tagline
         JLabel lblTag = new JLabel("KAWAII 8-BIT OPERATING SYSTEM SIMULATOR");
@@ -195,13 +218,13 @@ public class MainMenuPanel extends JPanel {
         lblTag.setAlignmentX(Component.LEFT_ALIGNMENT);
         container.add(lblTag);
 
-        container.add(Box.createVerticalStrut(36));
+        container.add(Box.createVerticalStrut(40));
 
-        // 4. Vertical Game Text Menu Items (clean, pure text without clunky boxes)
-        JPanel menuList = new JPanel();
-        menuList.setOpaque(false);
-        menuList.setLayout(new BoxLayout(menuList, BoxLayout.Y_AXIS));
-        menuList.setAlignmentX(Component.LEFT_ALIGNMENT);
+        // 4. Vertical Game Text Menu Items (clean, pure text like Homefront)
+        menuListPanel = new JPanel();
+        menuListPanel.setOpaque(false);
+        menuListPanel.setLayout(new BoxLayout(menuListPanel, BoxLayout.Y_AXIS));
+        menuListPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
 
         for (int i = 0; i < menuTitles.length; i++) {
             final int idx = i;
@@ -210,10 +233,20 @@ public class MainMenuPanel extends JPanel {
                 protected void paintComponent(Graphics g) {
                     super.paintComponent(g);
                     if (selectedMenuIndex == idx) {
-                        // Subtle glowing neon highlight indicator bar on left
+                        // Pink neon indicator bar on left (like Homefront's yellow highlight)
                         Graphics2D g2 = (Graphics2D) g.create();
-                        g2.setColor(RetroTheme.ACCENT_PINK);
+                        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                        int barAlpha = (int)(pulseAlpha * 255);
+                        g2.setColor(new Color(255, 42, 141, barAlpha));
                         g2.fillRect(0, 4, 3, getHeight() - 8);
+
+                        // Subtle horizontal glow behind selected item
+                        GradientPaint glowH = new GradientPaint(
+                            0, 0, new Color(255, 42, 141, 25),
+                            280, 0, new Color(255, 42, 141, 0)
+                        );
+                        g2.setPaint(glowH);
+                        g2.fillRect(0, 0, 280, getHeight());
                         g2.dispose();
                     }
                 }
@@ -221,26 +254,30 @@ public class MainMenuPanel extends JPanel {
             itemRow.setOpaque(false);
             itemRow.setLayout(new BoxLayout(itemRow, BoxLayout.Y_AXIS));
             itemRow.setAlignmentX(Component.LEFT_ALIGNMENT);
-            itemRow.setBorder(BorderFactory.createEmptyBorder(6, 12, 6, 12));
+            itemRow.setBorder(BorderFactory.createEmptyBorder(8, 14, 8, 14));
             itemRow.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+            itemRow.setMaximumSize(new Dimension(500, 60));
 
             // Main Menu Item Title
+            boolean isSel = (selectedMenuIndex == idx);
             JLabel lblItem = new JLabel(menuTitles[i]);
-            lblItem.setFont(new Font("Consolas", Font.BOLD, 22));
-            lblItem.setForeground(selectedMenuIndex == idx ? RetroTheme.ACCENT_PINK : Color.WHITE);
+            lblItem.setFont(new Font("Consolas", Font.BOLD, isSel ? 24 : 22));
+            lblItem.setForeground(isSel ? RetroTheme.ACCENT_PINK : new Color(220, 220, 235));
+            lblItem.setName("menu-title-" + i);
             itemRow.add(lblItem);
 
-            // Subtitle hint that shows for selected item
+            // Subtitle hint (only visible on selected)
             JLabel lblSub = new JLabel(menuSubtitles[i]);
             lblSub.setFont(new Font("Consolas", Font.PLAIN, 10));
-            lblSub.setForeground(selectedMenuIndex == idx ? RetroTheme.ACCENT_CYAN : new Color(150, 150, 170, 0));
+            lblSub.setForeground(isSel ? RetroTheme.ACCENT_CYAN : new Color(150, 150, 170, 0));
+            lblSub.setName("menu-sub-" + i);
             itemRow.add(lblSub);
 
             itemRow.addMouseListener(new MouseAdapter() {
                 @Override
                 public void mouseEntered(MouseEvent e) {
                     selectedMenuIndex = idx;
-                    updateMenuStyles(menuList);
+                    updateMenuStyles();
                     repaint();
                 }
                 @Override
@@ -249,26 +286,37 @@ public class MainMenuPanel extends JPanel {
                 }
             });
 
-            menuList.add(itemRow);
-            menuList.add(Box.createVerticalStrut(14));
+            menuListPanel.add(itemRow);
         }
 
-        container.add(menuList);
+        container.add(menuListPanel);
+        container.add(Box.createVerticalGlue());
+
         return container;
     }
 
-    private void updateMenuStyles(JPanel menuList) {
-        int compCount = menuList.getComponentCount();
+    private void updateMenuStyles() {
+        if (menuListPanel == null) return;
+        int compCount = menuListPanel.getComponentCount();
         int itemIdx = 0;
         for (int i = 0; i < compCount; i++) {
-            Component c = menuList.getComponent(i);
+            Component c = menuListPanel.getComponent(i);
             if (c instanceof JPanel) {
                 JPanel row = (JPanel) c;
-                JLabel titleLbl = (JLabel) row.getComponent(0);
-                JLabel subLbl = (JLabel) row.getComponent(1);
-                boolean isSel = (itemIdx == selectedMenuIndex);
-                titleLbl.setForeground(isSel ? RetroTheme.ACCENT_PINK : new Color(230, 230, 245));
-                subLbl.setForeground(isSel ? RetroTheme.ACCENT_CYAN : new Color(150, 150, 170, 0));
+                for (Component child : row.getComponents()) {
+                    if (child instanceof JLabel) {
+                        JLabel lbl = (JLabel) child;
+                        String name = lbl.getName();
+                        if (name != null && name.startsWith("menu-title-")) {
+                            boolean isSel = (itemIdx == selectedMenuIndex);
+                            lbl.setFont(new Font("Consolas", Font.BOLD, isSel ? 24 : 22));
+                            lbl.setForeground(isSel ? RetroTheme.ACCENT_PINK : new Color(220, 220, 235));
+                        } else if (name != null && name.startsWith("menu-sub-")) {
+                            boolean isSel = (itemIdx == selectedMenuIndex);
+                            lbl.setForeground(isSel ? RetroTheme.ACCENT_CYAN : new Color(150, 150, 170, 0));
+                        }
+                    }
+                }
                 itemIdx++;
             }
         }
@@ -278,9 +326,9 @@ public class MainMenuPanel extends JPanel {
     private JPanel createBottomBar() {
         JPanel bar = new JPanel(new BorderLayout(20, 0));
         bar.setOpaque(false);
-        bar.setBorder(BorderFactory.createEmptyBorder(12, 70, 18, 70));
+        bar.setBorder(BorderFactory.createEmptyBorder(8, 70, 16, 70));
 
-        // Bottom Left: Player Profile & Session info (matching reference image)
+        // Bottom Left: Player Profile & Session info
         JPanel leftBox = new JPanel();
         leftBox.setOpaque(false);
         leftBox.setLayout(new BoxLayout(leftBox, BoxLayout.Y_AXIS));
@@ -288,7 +336,7 @@ public class MainMenuPanel extends JPanel {
         JPanel profileRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
         profileRow.setOpaque(false);
         JLabel icon = new JLabel("👤");
-        icon.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 14));
+        icon.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 13));
         profileRow.add(icon);
 
         JLabel lblProfile = new JLabel("PROFILE: " + AppState.playerName);
@@ -297,15 +345,32 @@ public class MainMenuPanel extends JPanel {
         profileRow.add(lblProfile);
         leftBox.add(profileRow);
 
-        JLabel lblTicker = new JLabel("// BUILD 01.09 // EDUCATION CORE // HI-SCORE: 000000 // STATUS: NOMINAL");
-        lblTicker.setFont(new Font("Consolas", Font.PLAIN, 9));
-        lblTicker.setForeground(RetroTheme.ACCENT_PINK);
-        lblTicker.setBorder(BorderFactory.createEmptyBorder(3, 22, 0, 0));
-        leftBox.add(lblTicker);
+        // Scrolling ticker (like Homefront's RSS feed)
+        JPanel tickerRow = new JPanel() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                super.paintComponent(g);
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setFont(new Font("Consolas", Font.PLAIN, 9));
+                g2.setColor(RetroTheme.ACCENT_PINK);
+                g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+                String ticker = "// BUILD 01.09 // EDUCATION CORE // HI-SCORE: " +
+                    AppState.getScoreFormatted() + " // STATUS: NOMINAL // MINI//OS ARCADE SYSTEM ONLINE // ";
+                // Draw ticker twice for seamless looping
+                int x = (int) tickerOffset;
+                g2.drawString(ticker + ticker, x, 11);
+                g2.dispose();
+            }
+            @Override
+            public Dimension getPreferredSize() { return new Dimension(400, 16); }
+        };
+        tickerRow.setOpaque(false);
+        tickerRow.setBorder(BorderFactory.createEmptyBorder(2, 22, 0, 0));
+        leftBox.add(tickerRow);
 
         bar.add(leftBox, BorderLayout.WEST);
 
-        // Bottom Right: Game Controller Prompts (e.g., [ENTER] SELECT, [ESC] QUIT)
+        // Bottom Right: Game Controller Prompts
         JPanel rightBox = new JPanel(new FlowLayout(FlowLayout.RIGHT, 16, 4));
         rightBox.setOpaque(false);
 
@@ -324,7 +389,7 @@ public class MainMenuPanel extends JPanel {
     private JLabel createPromptPill(String key, String action, Color c) {
         JLabel l = new JLabel("<html><b><font color='" + toHex(c) + "'>[" + key + "]</font></b> " + action + "</html>");
         l.setFont(new Font("Consolas", Font.BOLD, 11));
-        l.setForeground(new Color(230, 230, 240));
+        l.setForeground(new Color(200, 200, 220));
         return l;
     }
 
@@ -336,6 +401,7 @@ public class MainMenuPanel extends JPanel {
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
         Graphics2D g2 = (Graphics2D) g.create();
+        g2.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
 
         int w = getWidth();
         int h = getHeight();
@@ -343,49 +409,63 @@ public class MainMenuPanel extends JPanel {
         // 1. Draw Full-Bleed Background Image across the entire canvas
         if (bgImage != null) {
             g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-            g2.drawImage(bgImage, 0, 0, w, h, this);
+            // Cover-fit: fill entire panel, crop if aspect mismatch
+            double imgW = bgImage.getWidth(null);
+            double imgH = bgImage.getHeight(null);
+            double scaleX = w / imgW;
+            double scaleY = h / imgH;
+            double scale = Math.max(scaleX, scaleY);
+            int drawW = (int)(imgW * scale);
+            int drawH = (int)(imgH * scale);
+            int drawX = (w - drawW) / 2;
+            int drawY = (h - drawH) / 2;
+            g2.drawImage(bgImage, drawX, drawY, drawW, drawH, this);
         } else {
             g2.setColor(RetroTheme.BG_DARK);
             g2.fillRect(0, 0, w, h);
         }
 
-        // 2. Multi-Stop Ultra-Smooth LinearGradient Blend (Horizontal Left to Right)
-        // Seamlessly blends from deep solid dark behind menu text into the clear arcade room
-        // Absolutely NO hard cutoff, seam, or abrupt divider line!
-        float[] fractions = { 0.0f, 0.28f, 0.40f, 0.54f, 0.68f, 0.82f, 1.0f };
+        // 2. Cinematic LEFT-HEAVY Dark Gradient Overlay (Homefront style)
+        // The left ~45% is nearly opaque dark for perfect text readability
+        // Then it feathers out to transparent showing the full background art on the right
+        float[] fractions = { 0.0f, 0.30f, 0.42f, 0.52f, 0.62f, 0.75f, 1.0f };
         Color[] colors = {
-            new Color(8, 7, 16, 255), // Solid dark at left edge
-            new Color(8, 7, 16, 255), // Stays solid dark covering menu text
-            new Color(8, 7, 16, 215), // Ultra-gentle start of roll-off
-            new Color(8, 7, 16, 125), // Soft mid feathering
-            new Color(8, 7, 16, 45),  // Near transparent
-            new Color(8, 7, 16, 0),   // Fully transparent - reveals full image
-            new Color(8, 7, 16, 0)
+            new Color(6, 4, 14, 250),   // Nearly solid at left edge
+            new Color(6, 4, 14, 245),   // Still solid behind menu text area
+            new Color(6, 4, 14, 200),   // Start of gentle fade
+            new Color(6, 4, 14, 120),   // Midway transparency
+            new Color(6, 4, 14, 50),    // Nearly transparent
+            new Color(6, 4, 14, 10),    // Barely there
+            new Color(6, 4, 14, 0)      // Fully transparent — shows background art
         };
-        LinearGradientPaint smoothFade = new LinearGradientPaint(
+        LinearGradientPaint leftFade = new LinearGradientPaint(
             new Point2D.Float(0, 0),
             new Point2D.Float(w, 0),
             fractions,
             colors
         );
-        g2.setPaint(smoothFade);
+        g2.setPaint(leftFade);
         g2.fillRect(0, 0, w, h);
 
-        // 3. Subtle bottom vignette so bottom bar text and controller prompts stay crisp
+        // 3. Bottom vignette for bottom bar text readability
         Paint gradBottom = new GradientPaint(
-                0, h - 90, new Color(8, 7, 16, 0),
-                0, h, new Color(8, 7, 16, 220)
+                0, h - 80, new Color(6, 4, 14, 0),
+                0, h, new Color(6, 4, 14, 210)
         );
         g2.setPaint(gradBottom);
-        g2.fillRect(0, h - 90, w, 90);
+        g2.fillRect(0, h - 80, w, 80);
 
-        // 4. Subtle top vignette for the top right toolbar
+        // 4. Subtle top vignette for the top right toolbar area
         Paint gradTop = new GradientPaint(
-                0, 0, new Color(8, 7, 16, 180),
-                0, 55, new Color(8, 7, 16, 0)
+                0, 0, new Color(6, 4, 14, 140),
+                0, 50, new Color(6, 4, 14, 0)
         );
         g2.setPaint(gradTop);
-        g2.fillRect(0, 0, w, 55);
+        g2.fillRect(0, 0, w, 50);
+
+        // 5. Very subtle overall film grain / noise tint for cinematic feel
+        g2.setColor(new Color(0, 0, 0, 15));
+        g2.fillRect(0, 0, w, h);
 
         g2.dispose();
     }

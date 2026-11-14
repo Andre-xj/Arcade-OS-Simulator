@@ -2,13 +2,17 @@ package arcadeos;
 
 import java.awt.*;
 import java.awt.event.*;
-import java.awt.image.BufferedImage;
+import java.awt.geom.*;
 import javax.swing.*;
 
 /**
  * Screen 3: OPERATING SYSTEM ARCHIVES & STAGE SELECT
- * Features a buttery-smooth, cinematic sliding Arcade Carousel with double-buffered
- * easing transitions, floating idle mascot sprites, and breathing neon auras.
+ * Features a clean, high-contrast, uncluttered AAA Game Stage Selection Carousel:
+ * - Removed redundant text and broken unicode glyphs ([?])
+ * - Replaced broken star glyphs with custom vector difficulty rating bars
+ * - High-contrast readable typography (Consolas bold, bright colors)
+ * - True continuous rail coordinate system (no gaps, no seams)
+ * - Vector chevron buttons (< and >)
  */
 public class ArchivesPanel extends JPanel {
     private ArcadeOS parentFrame;
@@ -18,14 +22,11 @@ public class ArchivesPanel extends JPanel {
     private int currentStageIndex = 0;
     private boolean isCarouselMode = true;
 
-    // Smooth & Slower Animation Engine
-    private Timer slideTimer;
-    private Timer mascotPulseTimer;
-    private boolean isSliding = false;
-    private float slideProgress = 1.0f;
-    private int slideDirection = 1; // +1 = next (slides left), -1 = prev (slides right)
-    private BufferedImage snapshotOld = null;
-    private BufferedImage snapshotNew = null;
+    // Smooth continuous rail animation variables
+    private float currentScroll = 0.0f;
+    private float targetScroll = 0.0f;
+    private Timer railTimer;
+    private Timer idleAnimTimer;
 
     private int pulseTicks = 0;
     private float bobOffset = 0.0f;
@@ -34,7 +35,7 @@ public class ArchivesPanel extends JPanel {
     private JPanel centerContentHolder;
     private JPanel carouselView;
     private JPanel gridView;
-    private JPanel cardsRow;
+    private CarouselCanvas carouselCanvas;
     private JPanel stageIndicatorsPanel;
 
     public static class ArchiveCardData {
@@ -43,7 +44,7 @@ public class ArchivesPanel extends JPanel {
         public String subtitle;
         public String desc;
         public String[] tags;
-        public int complexity; // 1 to 5
+        public int complexity;
         public int tabIndex;
 
         public ArchiveCardData(String num, String title, String subtitle, String desc, String[] tags, int comp, int tab) {
@@ -85,10 +86,10 @@ public class ArchivesPanel extends JPanel {
         setLayout(new BorderLayout(0, 8));
         setBorder(BorderFactory.createEmptyBorder(10, 16, 10, 16));
 
-        // 1. Top Header
+        // 1. Clean, uncluttered Top Header
         add(createHeader(), BorderLayout.NORTH);
 
-        // 2. Center Content Holder (Switches between Carousel and Grid)
+        // 2. Center Content Holder (Carousel / Grid)
         centerContentHolder = new JPanel(new BorderLayout());
         centerContentHolder.setOpaque(false);
 
@@ -98,26 +99,26 @@ public class ArchivesPanel extends JPanel {
         centerContentHolder.add(isCarouselMode ? carouselView : gridView, BorderLayout.CENTER);
         add(centerContentHolder, BorderLayout.CENTER);
 
-        // 3. Bottom Navigation Bar
+        // 3. Clean Bottom Navigation Bar
         add(createBottomNav(), BorderLayout.SOUTH);
 
-        // Slower, graceful idle mascot floating & breathing glow animation (30 FPS)
-        mascotPulseTimer = new Timer(33, e -> {
+        // Idle sprite float & neon pulse timer (60 FPS)
+        idleAnimTimer = new Timer(16, e -> {
             pulseTicks++;
-            bobOffset = (float)(Math.sin(pulseTicks * 0.055) * 6.0); // Gentle 6px float
-            glowPulse = (float)(0.55 + 0.40 * Math.sin(pulseTicks * 0.040)); // Slow breathing aura
-            if (isCarouselMode && cardsRow != null && !isSliding) {
-                cardsRow.repaint();
+            bobOffset = (float)(Math.sin(pulseTicks * 0.055) * 6.0);
+            glowPulse = (float)(0.60 + 0.38 * Math.sin(pulseTicks * 0.045));
+            if (isCarouselMode && carouselCanvas != null) {
+                carouselCanvas.repaint();
             }
         });
-        mascotPulseTimer.start();
+        idleAnimTimer.start();
 
         // Keyboard navigation for Carousel
         setFocusable(true);
         addKeyListener(new KeyAdapter() {
             @Override
             public void keyPressed(KeyEvent e) {
-                if (isCarouselMode && !isSliding) {
+                if (isCarouselMode) {
                     if (e.getKeyCode() == KeyEvent.VK_LEFT || e.getKeyCode() == KeyEvent.VK_A) {
                         prevStage();
                     } else if (e.getKeyCode() == KeyEvent.VK_RIGHT || e.getKeyCode() == KeyEvent.VK_D) {
@@ -132,6 +133,7 @@ public class ArchivesPanel extends JPanel {
         });
     }
 
+    /** Clean, focused header with no verbose text clutter */
     private JPanel createHeader() {
         JPanel header = new JPanel(new BorderLayout(15, 0));
         header.setBackground(RetroTheme.PANEL_BG);
@@ -140,7 +142,7 @@ public class ArchivesPanel extends JPanel {
                 BorderFactory.createEmptyBorder(8, 14, 8, 14)
         ));
 
-        // Left Section: Mascot + MINI//OS + 3 mini buttons
+        // Left: Mascot + Title
         JPanel left = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
         left.setOpaque(false);
         left.add(new JLabel(new ImageIcon(PixelSprites.createRobotSprite(32))));
@@ -151,7 +153,7 @@ public class ArchivesPanel extends JPanel {
 
         JPanel titleRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
         titleRow.setOpaque(false);
-        JLabel lm = new JLabel("M ");
+        JLabel lm = new JLabel("MINI ");
         lm.setFont(new Font("Consolas", Font.BOLD, 15));
         lm.setForeground(Color.WHITE);
         JLabel ls = new JLabel("// ");
@@ -163,57 +165,42 @@ public class ArchivesPanel extends JPanel {
         titleRow.add(lm); titleRow.add(ls); titleRow.add(lo);
         leftText.add(titleRow);
 
-        JLabel tag = new JLabel("[ CINEMATIC STAGE CAROUSEL ]");
-        tag.setFont(new Font("Consolas", Font.PLAIN, 8));
-        tag.setForeground(RetroTheme.ACCENT_CYAN);
+        JLabel tag = new JLabel("OPERATING SYSTEM SIMULATOR");
+        tag.setFont(new Font("Consolas", Font.PLAIN, 9));
+        tag.setForeground(RetroTheme.TEXT_DIM);
         leftText.add(tag);
 
         left.add(leftText);
         header.add(left, BorderLayout.WEST);
 
-        // Center Section: Title & Subtitles
+        // Center: Single clean title and concise hint
         JPanel center = new JPanel();
         center.setOpaque(false);
         center.setLayout(new BoxLayout(center, BoxLayout.Y_AXIS));
 
-        JLabel subTag = new JLabel("OPERATING SYSTEM SIMULATOR // STAGE SELECT");
-        subTag.setFont(new Font("Consolas", Font.BOLD, 9));
-        subTag.setForeground(RetroTheme.ACCENT_PINK);
-        subTag.setAlignmentX(Component.CENTER_ALIGNMENT);
-        center.add(subTag);
-
-        JPanel midRow = new JPanel(new FlowLayout(FlowLayout.CENTER, 8, 0));
-        midRow.setOpaque(false);
-        JLabel mainTitle = new JLabel("OPERATING SYSTEM ARCHIVES & MANUALS");
-        mainTitle.setFont(new Font("Consolas", Font.BOLD, 14));
+        JLabel mainTitle = new JLabel("STAGE SELECT  //  SYSTEM ARCHIVES");
+        mainTitle.setFont(new Font("Consolas", Font.BOLD, 15));
         mainTitle.setForeground(Color.WHITE);
-        midRow.add(mainTitle);
+        mainTitle.setAlignmentX(Component.CENTER_ALIGNMENT);
+        center.add(mainTitle);
 
-        JLabel pill = new JLabel(" [ ARCHIVIST SESSION ACTIVE ] ");
-        pill.setFont(new Font("Consolas", Font.BOLD, 9));
-        pill.setForeground(RetroTheme.ACCENT_GREEN);
-        pill.setBorder(BorderFactory.createLineBorder(RetroTheme.ACCENT_GREEN, 1));
-        midRow.add(pill);
-        center.add(midRow);
-
-        JLabel desc = new JLabel("Smoothly browse through 8 OS stages, inspect interactive manuals, and launch simulation missions.");
+        JLabel desc = new JLabel("SELECT A MODULE TO VIEW ARCHIVE MANUAL OR LAUNCH SIMULATOR");
         desc.setFont(new Font("Consolas", Font.PLAIN, 10));
-        desc.setForeground(RetroTheme.TEXT_DIM);
+        desc.setForeground(RetroTheme.ACCENT_CYAN);
         desc.setAlignmentX(Component.CENTER_ALIGNMENT);
         center.add(desc);
 
         header.add(center, BorderLayout.CENTER);
 
-        // Right Section: View Switcher (Carousel / Grid) + Files Read Counter
-        JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 12, 4));
+        // Right: View Switcher + Clean Counter
+        JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 14, 4));
         right.setOpaque(false);
 
-        JButton btnToggleView = RetroTheme.createRetroButton("🎠 CAROUSEL", RetroTheme.BTN_DARK, RetroTheme.ACCENT_CYAN);
-        btnToggleView.setFont(new Font("Consolas", Font.BOLD, 9));
+        JButton btnToggleView = RetroTheme.createRetroButton("CAROUSEL VIEW", RetroTheme.BTN_DARK, RetroTheme.ACCENT_CYAN);
+        btnToggleView.setFont(new Font("Consolas", Font.BOLD, 10));
         btnToggleView.addActionListener(e -> {
-            if (isSliding) return;
             isCarouselMode = !isCarouselMode;
-            btnToggleView.setText(isCarouselMode ? "🎠 CAROUSEL" : "⊞ GRID VIEW");
+            btnToggleView.setText(isCarouselMode ? "CAROUSEL VIEW" : "GRID VIEW");
             btnToggleView.setForeground(isCarouselMode ? RetroTheme.ACCENT_CYAN : RetroTheme.ACCENT_YELLOW);
             centerContentHolder.removeAll();
             centerContentHolder.add(isCarouselMode ? carouselView : gridView, BorderLayout.CENTER);
@@ -223,7 +210,6 @@ public class ArchivesPanel extends JPanel {
         });
         right.add(btnToggleView);
 
-        // Files Read Counter
         JPanel readBox = new JPanel();
         readBox.setOpaque(false);
         readBox.setLayout(new BoxLayout(readBox, BoxLayout.Y_AXIS));
@@ -233,7 +219,7 @@ public class ArchivesPanel extends JPanel {
         lblRead.setForeground(RetroTheme.TEXT_DIM);
         readBox.add(lblRead);
 
-        lblFilesReadCounter = new JLabel(String.format("%03d / 008", AppState.countFilesRead()));
+        lblFilesReadCounter = new JLabel(String.format("%02d / 08", AppState.countFilesRead()));
         lblFilesReadCounter.setFont(new Font("Consolas", Font.BOLD, 16));
         lblFilesReadCounter.setForeground(RetroTheme.ACCENT_YELLOW);
         readBox.add(lblFilesReadCounter);
@@ -245,7 +231,7 @@ public class ArchivesPanel extends JPanel {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // DUAL-BUFFERED CINEMATIC SLIDING CAROUSEL
+    // TRUE MAP/LEVEL SELECT CONTINUOUS CAROUSEL
     // ─────────────────────────────────────────────────────────────────────────
 
     private JPanel createCarouselView() {
@@ -253,352 +239,498 @@ public class ArchivesPanel extends JPanel {
         container.setOpaque(false);
         container.setBorder(BorderFactory.createEmptyBorder(6, 4, 4, 4));
 
-        // 1. Center Stage Slider Track
-        JPanel sliderTrack = new JPanel(new BorderLayout(14, 0));
+        JPanel sliderTrack = new JPanel(new BorderLayout(8, 0));
         sliderTrack.setOpaque(false);
 
-        // Big Left Carousel Button
-        JButton btnPrev = createCarouselNavButton("◀", "PREV STAGE [A]");
+        // Vector Left Nav Button (<)
+        VectorArrowButton btnPrev = new VectorArrowButton(true, "PREV STAGE [A]");
         btnPrev.addActionListener(e -> { prevStage(); requestFocusInWindow(); });
         sliderTrack.add(btnPrev, BorderLayout.WEST);
 
-        // Smooth Dual-Snapshot Carousel Sliding Canvas
-        cardsRow = new JPanel(new GridBagLayout()) {
-            @Override
-            protected void paintComponent(Graphics g) {
-                super.paintComponent(g);
-                if (isSliding && snapshotOld != null && snapshotNew != null) {
-                    Graphics2D g2 = (Graphics2D) g.create();
-                    g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                    g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+        // Continuous-rail stage canvas
+        carouselCanvas = new CarouselCanvas();
+        sliderTrack.add(carouselCanvas, BorderLayout.CENTER);
 
-                    int w = getWidth();
-                    int h = getHeight();
-
-                    // Slower, graceful sinusoidal ease-in-out curve
-                    float t = slideProgress;
-                    float ease = (float)(0.5 - 0.5 * Math.cos(t * Math.PI));
-
-                    // Direction: +1 means moving to next (current shifts left, next comes from right)
-                    int shiftOld = (int)(-slideDirection * ease * w);
-                    int shiftNew = (int)(shiftOld + slideDirection * w);
-
-                    // Draw outgoing snapshot with subtle fading
-                    float alphaOld = Math.max(0.0f, Math.min(1.0f, 1.0f - ease * 0.35f));
-                    g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, alphaOld));
-                    g2.drawImage(snapshotOld, shiftOld, 0, w, h, null);
-
-                    // Draw incoming snapshot with smooth fading in
-                    float alphaNew = Math.max(0.0f, Math.min(1.0f, 0.40f + ease * 0.60f));
-                    g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, alphaNew));
-                    g2.drawImage(snapshotNew, shiftNew, 0, w, h, null);
-
-                    g2.dispose();
-                }
-            }
-
-            @Override
-            protected void paintChildren(Graphics g) {
-                // When actively sliding, hide child components and paint smooth snapshots instead
-                if (!isSliding) {
-                    super.paintChildren(g);
-                }
-            }
-        };
-        cardsRow.setOpaque(false);
-        rebuildCarouselCards();
-
-        sliderTrack.add(cardsRow, BorderLayout.CENTER);
-
-        // Big Right Carousel Button
-        JButton btnNext = createCarouselNavButton("▶", "NEXT STAGE [D]");
+        // Vector Right Nav Button (>)
+        VectorArrowButton btnNext = new VectorArrowButton(false, "NEXT STAGE [D]");
         btnNext.addActionListener(e -> { nextStage(); requestFocusInWindow(); });
         sliderTrack.add(btnNext, BorderLayout.EAST);
 
         container.add(sliderTrack, BorderLayout.CENTER);
 
-        // 2. Bottom Stage Selector Strip & Dots
+        // Bottom Stage Selector Strip
         stageIndicatorsPanel = createStageIndicatorsStrip();
         container.add(stageIndicatorsPanel, BorderLayout.SOUTH);
 
         return container;
     }
 
-    private void rebuildCarouselCards() {
-        if (cardsRow == null) return;
-        cardsRow.removeAll();
-        GridBagConstraints gbc = new GridBagConstraints();
-        gbc.gridy = 0;
-        gbc.fill = GridBagConstraints.BOTH;
-        gbc.insets = new Insets(0, 8, 0, 8);
+    /**
+     * Vector Arrow Button: Renders custom antialiased chevron arrows.
+     * Guaranteed never to fail font character rendering or show [?] glyphs!
+     */
+    private class VectorArrowButton extends JButton {
+        private boolean isLeft;
 
-        int prevIdx = (currentStageIndex - 1 + cards.length) % cards.length;
-        int nextIdx = (currentStageIndex + 1) % cards.length;
+        public VectorArrowButton(boolean isLeft, String tooltip) {
+            this.isLeft = isLeft;
+            setPreferredSize(new Dimension(46, 0));
+            setFocusPainted(false);
+            setOpaque(false);
+            setContentAreaFilled(false);
+            setBorder(BorderFactory.createEmptyBorder());
+            setToolTipText(tooltip);
+            setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        }
 
-        // 1. Left Peeker Card
-        gbc.gridx = 0;
-        gbc.weightx = 0.22;
-        gbc.weighty = 1.0;
-        JPanel leftPeeker = createPeekerCard(cards[prevIdx], prevIdx, true);
-        cardsRow.add(leftPeeker, gbc);
+        @Override
+        protected void paintComponent(Graphics g) {
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
-        // 2. Center Hero Featured Stage Card
-        gbc.gridx = 1;
-        gbc.weightx = 0.56;
-        gbc.weighty = 1.0;
-        JPanel centerHero = createHeroStageCard(cards[currentStageIndex], currentStageIndex);
-        cardsRow.add(centerHero, gbc);
+            int w = getWidth();
+            int h = getHeight();
+            boolean hover = getModel().isRollover();
 
-        // 3. Right Peeker Card
-        gbc.gridx = 2;
-        gbc.weightx = 0.22;
-        gbc.weighty = 1.0;
-        JPanel rightPeeker = createPeekerCard(cards[nextIdx], nextIdx, false);
-        cardsRow.add(rightPeeker, gbc);
+            // Background pill
+            g2.setColor(hover ? new Color(55, 30, 95, 230) : new Color(22, 16, 42, 200));
+            g2.fillRoundRect(2, 10, w - 4, h - 20, 14, 14);
 
-        cardsRow.revalidate();
-        cardsRow.repaint();
+            // Border
+            g2.setColor(hover ? RetroTheme.ACCENT_CYAN : new Color(70, 50, 105));
+            g2.setStroke(new BasicStroke(hover ? 1.8f : 1.2f));
+            g2.drawRoundRect(2, 10, w - 4, h - 20, 14, 14);
+
+            // Vector Chevron Arrow
+            int cx = w / 2;
+            int cy = h / 2;
+            g2.setColor(hover ? RetroTheme.ACCENT_CYAN : Color.WHITE);
+            g2.setStroke(new BasicStroke(3.0f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+
+            if (isLeft) {
+                g2.drawLine(cx + 4, cy - 14, cx - 6, cy);
+                g2.drawLine(cx - 6, cy, cx + 4, cy + 14);
+            } else {
+                g2.drawLine(cx - 4, cy - 14, cx + 6, cy);
+                g2.drawLine(cx + 6, cy, cx - 4, cy + 14);
+            }
+
+            g2.dispose();
+        }
     }
 
-    /** Center Hero Card with breathing animation and floating sprite */
-    private JPanel createHeroStageCard(ArchiveCardData d, int idx) {
-        JPanel hero = new JPanel(new BorderLayout(0, 10)) {
-            @Override
-            protected void paintComponent(Graphics g) {
-                Graphics2D g2 = (Graphics2D) g.create();
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                // Card background
-                g2.setColor(new Color(24, 16, 46));
-                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 16, 16);
+    /**
+     * Continuous Stage Rail Canvas:
+     * High-contrast readable typography, clean spacing, and zero broken characters.
+     */
+    private class CarouselCanvas extends JPanel {
+        private Rectangle manualBtnBounds = new Rectangle();
+        private Rectangle launchBtnBounds = new Rectangle();
+        private Rectangle quizBtnBounds = new Rectangle();
+        private Rectangle[] cardBounds = new Rectangle[cards.length];
 
-                // Breathing dynamic neon border with sinusoidal glow
+        public CarouselCanvas() {
+            setOpaque(false);
+            setCursor(Cursor.getPredefinedCursor(Cursor.DEFAULT_CURSOR));
+
+            for (int i = 0; i < cards.length; i++) {
+                cardBounds[i] = new Rectangle();
+            }
+
+            addMouseListener(new MouseAdapter() {
+                @Override
+                public void mouseClicked(MouseEvent e) {
+                    Point p = e.getPoint();
+
+                    // Check hero buttons if near center
+                    if (Math.abs(currentScroll - targetScroll) < 0.20f) {
+                        if (manualBtnBounds.contains(p)) {
+                            openManual(cards[currentStageIndex].tabIndex, currentStageIndex);
+                            return;
+                        } else if (launchBtnBounds.contains(p)) {
+                            AppState.markRead(currentStageIndex);
+                            updateCounters();
+                            parentFrame.openSimulatorTab(cards[currentStageIndex].tabIndex);
+                            return;
+                        } else if (quizBtnBounds.contains(p)) {
+                            parentFrame.showScreen(ArcadeOS.SCREEN_QUIZ);
+                            return;
+                        }
+                    }
+
+                    // Check if clicked on any visible peeker card to glide to it
+                    for (int i = 0; i < cards.length; i++) {
+                        if (i != currentStageIndex && cardBounds[i].contains(p)) {
+                            glideToStage(i);
+                            requestFocusInWindow();
+                            return;
+                        }
+                    }
+                }
+            });
+
+            addMouseMotionListener(new MouseMotionAdapter() {
+                @Override
+                public void mouseMoved(MouseEvent e) {
+                    Point p = e.getPoint();
+                    boolean overAction = manualBtnBounds.contains(p) ||
+                                         launchBtnBounds.contains(p) ||
+                                         quizBtnBounds.contains(p);
+                    boolean overCard = false;
+                    for (int i = 0; i < cards.length; i++) {
+                        if (i != currentStageIndex && cardBounds[i].contains(p)) {
+                            overCard = true;
+                            break;
+                        }
+                    }
+                    if (overAction || overCard) {
+                        setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+                    } else {
+                        setCursor(Cursor.getPredefinedCursor(Cursor.DEFAULT_CURSOR));
+                    }
+                }
+            });
+        }
+
+        @Override
+        protected void paintComponent(Graphics g) {
+            super.paintComponent(g);
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+            g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+
+            int w = getWidth();
+            int h = getHeight();
+            if (w <= 0 || h <= 0) {
+                g2.dispose();
+                return;
+            }
+
+            int centerX = w / 2;
+
+            // Geometry proportions
+            int heroW = Math.min(620, (int)(w * 0.54));
+            int heroH = h - 16;
+            int peekerW = (int)(w * 0.22);
+            int peekerH = (int)(heroH * 0.88);
+
+            int stepDistance = (heroW / 2) + 16 + (peekerW / 2);
+
+            manualBtnBounds.setBounds(0, 0, 0, 0);
+            launchBtnBounds.setBounds(0, 0, 0, 0);
+            quizBtnBounds.setBounds(0, 0, 0, 0);
+
+            // Depth-sorted drawing
+            Integer[] order = new Integer[cards.length];
+            float[] diffs = new float[cards.length];
+            for (int i = 0; i < cards.length; i++) {
+                order[i] = i;
+                float diff = i - currentScroll;
+                while (diff < -4.0f) diff += cards.length;
+                while (diff > 4.0f)  diff -= cards.length;
+                diffs[i] = diff;
+            }
+
+            java.util.Arrays.sort(order, (a, b) -> Float.compare(Math.abs(diffs[b]), Math.abs(diffs[a])));
+
+            for (int cardIdx : order) {
+                float diff = diffs[cardIdx];
+                float dist = Math.abs(diff);
+
+                if (dist > 2.2f) {
+                    cardBounds[cardIdx].setBounds(0, 0, 0, 0);
+                    continue;
+                }
+
+                float focus = Math.max(0.0f, Math.min(1.0f, 1.0f - dist));
+
+                int cardW = (int)(peekerW + (heroW - peekerW) * focus);
+                int cardH = (int)(peekerH + (heroH - peekerH) * focus);
+
+                int cardCenterX = (int)(centerX + diff * stepDistance);
+                int cardX = cardCenterX - cardW / 2;
+                int cardY = (h - cardH) / 2;
+
+                cardBounds[cardIdx].setBounds(cardX, cardY, cardW, cardH);
+                paintStageCard(g2, cardIdx, cardX, cardY, cardW, cardH, focus);
+            }
+
+            g2.dispose();
+        }
+
+        private void paintStageCard(Graphics2D g2, int idx, int x, int y, int w, int h, float focus) {
+            Graphics2D g = (Graphics2D) g2.create();
+            g.setClip(x, y, w, h);
+
+            ArchiveCardData d = cards[idx];
+            boolean isHero = (focus > 0.65f);
+
+            int bgR = (int)(16 + (24 - 16) * focus);
+            int bgG = (int)(12 + (16 - 12) * focus);
+            int bgB = (int)(32 + (46 - 32) * focus);
+            int bgA = (int)(190 + 65 * focus);
+            g.setColor(new Color(bgR, bgG, bgB, bgA));
+            g.fillRoundRect(x, y, w, h, 14, 14);
+
+            if (isHero) {
+                // === HERO CARD PRESENTATION (Clean, High-Contrast) ===
+
+                // Neon breathing border
                 int alpha = (int)(glowPulse * 255);
-                Color dynamicBorder = new Color(5, 217, 232, Math.max(80, Math.min(255, alpha)));
-                g2.setColor(dynamicBorder);
-                g2.setStroke(new BasicStroke(2.2f));
-                g2.drawRoundRect(1, 1, getWidth() - 3, getHeight() - 3, 16, 16);
+                Color dynamicBorder = new Color(5, 217, 232, Math.max(90, Math.min(255, alpha)));
+                g.setColor(dynamicBorder);
+                g.setStroke(new BasicStroke(2.2f));
+                g.drawRoundRect(x + 1, y + 1, w - 3, h - 3, 14, 14);
 
-                // Inner top glow
+                // Top soft ambient glow
                 GradientPaint glow = new GradientPaint(
-                        0, 0, new Color(5, 217, 232, (int)(glowPulse * 55)),
-                        0, 90, new Color(5, 217, 232, 0)
+                        x, y, new Color(5, 217, 232, (int)(glowPulse * 50 * focus)),
+                        x, y + 80, new Color(5, 217, 232, 0)
                 );
-                g2.setPaint(glow);
-                g2.fillRoundRect(2, 2, getWidth() - 4, 90, 14, 14);
+                g.setPaint(glow);
+                g.fillRoundRect(x + 2, y + 2, w - 4, 80, 12, 12);
 
-                g2.dispose();
-                super.paintComponent(g);
-            }
-        };
-        hero.setOpaque(false);
-        hero.setBorder(BorderFactory.createEmptyBorder(16, 22, 16, 22));
+                int pad = 24;
 
-        // Top Row: Stage Badge + Read Status
-        JPanel topRow = new JPanel(new BorderLayout());
-        topRow.setOpaque(false);
+                // 1. Stage tag & Mission subtitle (NO BROKEN UNICODE GLYPHS!)
+                g.setFont(new Font("Consolas", Font.BOLD, 12));
+                g.setColor(RetroTheme.ACCENT_PINK);
+                String tagLine = "STAGE " + d.num + " / 08  //  " + d.subtitle;
+                g.drawString(tagLine, x + pad, y + 30);
 
-        JLabel stageBadge = new JLabel("✦ STAGE " + d.num + " / 08 ✦  " + d.subtitle);
-        stageBadge.setFont(new Font("Consolas", Font.BOLD, 11));
-        stageBadge.setForeground(RetroTheme.ACCENT_PINK);
-        topRow.add(stageBadge, BorderLayout.WEST);
+                // Clean Status Badge on Top Right
+                boolean isRead = (AppState.filesRead[idx] == 1);
+                String statusStr = isRead ? "READ [DONE]" : "UNREAD";
+                FontMetrics fm = g.getFontMetrics();
+                int stW = fm.stringWidth(statusStr) + 14;
+                int stX = x + w - pad - stW;
+                int stY = y + 16;
+                g.setColor(isRead ? new Color(20, 60, 35) : new Color(60, 45, 25));
+                g.fillRoundRect(stX, stY, stW, 20, 6, 6);
+                g.setColor(isRead ? RetroTheme.ACCENT_GREEN : RetroTheme.ACCENT_YELLOW);
+                g.drawRoundRect(stX, stY, stW, 20, 6, 6);
+                g.drawString(statusStr, stX + 7, stY + 14);
 
-        boolean isRead = (AppState.filesRead[idx] == 1);
-        JLabel statusLbl = new JLabel(isRead ? "STATUS: READ ✔ (+50 XP)" : "STATUS: UNREAD >");
-        statusLbl.setFont(new Font("Consolas", Font.BOLD, 10));
-        statusLbl.setForeground(isRead ? RetroTheme.ACCENT_GREEN : RetroTheme.ACCENT_YELLOW);
-        topRow.add(statusLbl, BorderLayout.EAST);
-        hero.add(topRow, BorderLayout.NORTH);
-
-        // Center: Floating Sprite + Title + Description + Tags + Complexity
-        JPanel body = new JPanel();
-        body.setOpaque(false);
-        body.setLayout(new BoxLayout(body, BoxLayout.Y_AXIS));
-
-        // Floating Animated Mascot Sprite (Gentle slow sine wave)
-        JPanel spriteHolder = new JPanel() {
-            @Override
-            public Dimension getPreferredSize() { return new Dimension(72, 72); }
-            @Override
-            public Dimension getMaximumSize() { return new Dimension(72, 72); }
-            @Override
-            protected void paintComponent(Graphics g) {
-                super.paintComponent(g);
-                Graphics2D g2 = (Graphics2D) g.create();
+                // 2. Animated floating mascot sprite (centered)
                 Image spr = getCardSprite(idx, 64);
-                int drawY = 4 + (int) bobOffset;
-                g2.drawImage(spr, 4, drawY, this);
-                g2.dispose();
+                int sprX = x + (w - 64) / 2;
+                int sprY = y + 46 + (int)bobOffset;
+                g.drawImage(spr, sprX, sprY, null);
+
+                // 3. Stage Title - BIG, BOLD, CRISP WHITE
+                g.setFont(new Font("Consolas", Font.BOLD, 22));
+                g.setColor(Color.WHITE);
+                fm = g.getFontMetrics();
+                g.drawString(d.title, x + (w - fm.stringWidth(d.title)) / 2, y + 138);
+
+                // 4. Description - Clear, readable text with comfortable contrast
+                g.setFont(new Font("Consolas", Font.PLAIN, 12));
+                g.setColor(new Color(225, 225, 245));
+                drawCenteredWrappedText(g, d.desc, x + pad, y + 162, w - pad * 2);
+
+                // 5. Algorithm Tags - High contrast pills
+                g.setFont(new Font("Consolas", Font.BOLD, 10));
+                fm = g.getFontMetrics();
+                int totalTagW = 0;
+                for (String t : d.tags) totalTagW += fm.stringWidth(t) + 18 + 8;
+                int tagX = x + (w - totalTagW) / 2;
+                int tagY = y + h - 116;
+                for (String t : d.tags) {
+                    int tw = fm.stringWidth(t) + 18;
+                    g.setColor(new Color(40, 30, 65));
+                    g.fillRoundRect(tagX, tagY, tw, 22, 6, 6);
+                    g.setColor(new Color(100, 80, 160));
+                    g.drawRoundRect(tagX, tagY, tw, 22, 6, 6);
+                    g.setColor(new Color(220, 215, 255));
+                    g.drawString(t, tagX + 9, tagY + 15);
+                    tagX += tw + 8;
+                }
+
+                // 6. Vector Difficulty Rating Bars (REPLACES BROKEN UNICODE [?] STARS!)
+                int compY = y + h - 76;
+                g.setFont(new Font("Consolas", Font.BOLD, 11));
+                g.setColor(RetroTheme.ACCENT_CYAN);
+                fm = g.getFontMetrics();
+                String compLabel = "DIFFICULTY:";
+                int labelW = fm.stringWidth(compLabel);
+
+                int pipW = 18;
+                int pipH = 8;
+                int pipGap = 5;
+                int totalPipsW = 5 * pipW + 4 * pipGap;
+                int totalCompW = labelW + 12 + totalPipsW;
+                int startCompX = x + (w - totalCompW) / 2;
+
+                g.drawString(compLabel, startCompX, compY + 8);
+
+                int pipX = startCompX + labelW + 12;
+                for (int c = 0; c < 5; c++) {
+                    if (c < d.complexity) {
+                        // Active pip: glowing neon yellow
+                        g.setColor(RetroTheme.ACCENT_YELLOW);
+                        g.fillRoundRect(pipX, compY, pipW, pipH, 4, 4);
+                    } else {
+                        // Inactive pip: dark subtle box
+                        g.setColor(new Color(38, 28, 58));
+                        g.fillRoundRect(pipX, compY, pipW, pipH, 4, 4);
+                        g.setColor(new Color(75, 55, 105));
+                        g.drawRoundRect(pipX, compY, pipW, pipH, 4, 4);
+                    }
+                    pipX += pipW + pipGap;
+                }
+
+                // 7. Clean Action Buttons (VIEW MANUAL, LAUNCH SIMULATOR, QUIZ ARENA)
+                int btnY = y + h - 50;
+                int btnH = 34;
+                int btnGap = 14;
+                String[] btnLabels = {"VIEW MANUAL", "LAUNCH SIMULATOR", "QUIZ ARENA"};
+                Color[] btnColors = {RetroTheme.ACCENT_CYAN, RetroTheme.ACCENT_PINK, RetroTheme.ACCENT_YELLOW};
+
+                g.setFont(new Font("Consolas", Font.BOLD, 11));
+                fm = g.getFontMetrics();
+                int[] bWidths = new int[3];
+                int totalBtnsW = 0;
+                for (int b = 0; b < 3; b++) {
+                    bWidths[b] = fm.stringWidth(btnLabels[b]) + 26;
+                    totalBtnsW += bWidths[b];
+                }
+                totalBtnsW += btnGap * 2;
+
+                int curBx = x + (w - totalBtnsW) / 2;
+
+                manualBtnBounds.setBounds(curBx, btnY, bWidths[0], btnH);
+                drawStyledButton(g, manualBtnBounds, btnLabels[0], btnColors[0], fm);
+                curBx += bWidths[0] + btnGap;
+
+                launchBtnBounds.setBounds(curBx, btnY, bWidths[1], btnH);
+                drawStyledButton(g, launchBtnBounds, btnLabels[1], btnColors[1], fm);
+                curBx += bWidths[1] + btnGap;
+
+                quizBtnBounds.setBounds(curBx, btnY, bWidths[2], btnH);
+                drawStyledButton(g, quizBtnBounds, btnLabels[2], btnColors[2], fm);
+
+            } else {
+                // === PEEKER CARD PRESENTATION (Clean, Compact) ===
+
+                g.setColor(new Color(65, 45, 95));
+                g.drawRoundRect(x, y, w - 1, h - 1, 14, 14);
+
+                int cx = x + w / 2;
+
+                // Stage Number tag
+                g.setFont(new Font("Consolas", Font.BOLD, 10));
+                g.setColor(RetroTheme.TEXT_DIM);
+                FontMetrics fm = g.getFontMetrics();
+                String numStr = "STAGE " + d.num;
+                g.drawString(numStr, cx - fm.stringWidth(numStr) / 2, y + 26);
+
+                // Compact mascot sprite
+                Image spr = getCardSprite(idx, 40);
+                g.drawImage(spr, cx - 20, y + 44, null);
+
+                // Stage Title
+                g.setFont(new Font("Consolas", Font.BOLD, 12));
+                g.setColor(new Color(200, 200, 235));
+                fm = g.getFontMetrics();
+                String title = d.title;
+                if (fm.stringWidth(title) > w - 16) {
+                    while (fm.stringWidth(title + "...") > w - 16 && title.length() > 3) {
+                        title = title.substring(0, title.length() - 1);
+                    }
+                    title += "...";
+                }
+                g.drawString(title, cx - fm.stringWidth(title) / 2, y + 104);
+
+                // Click to select hint
+                g.setFont(new Font("Consolas", Font.BOLD, 9));
+                g.setColor(RetroTheme.ACCENT_CYAN);
+                fm = g.getFontMetrics();
+                String hint = "[ CLICK TO SELECT ]";
+                g.drawString(hint, cx - fm.stringWidth(hint) / 2, y + h - 18);
             }
-        };
-        spriteHolder.setOpaque(false);
-        spriteHolder.setAlignmentX(Component.CENTER_ALIGNMENT);
-        body.add(spriteHolder);
-        body.add(Box.createVerticalStrut(6));
 
-        // Mission Title
-        JLabel titleLbl = new JLabel(d.title);
-        titleLbl.setFont(new Font("Consolas", Font.BOLD, 18));
-        titleLbl.setForeground(Color.WHITE);
-        titleLbl.setAlignmentX(Component.CENTER_ALIGNMENT);
-        body.add(titleLbl);
-        body.add(Box.createVerticalStrut(4));
-
-        // Description
-        JLabel descLbl = new JLabel("<html><center><font color='#B0B0D0' size='3'>" + d.desc + "</font></center></html>");
-        descLbl.setFont(new Font("Consolas", Font.PLAIN, 11));
-        descLbl.setAlignmentX(Component.CENTER_ALIGNMENT);
-        body.add(descLbl);
-        body.add(Box.createVerticalStrut(8));
-
-        // Tags
-        JPanel tagsPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 6, 2));
-        tagsPanel.setOpaque(false);
-        for (String t : d.tags) {
-            JLabel pill = new JLabel(t);
-            pill.setFont(new Font("Consolas", Font.PLAIN, 9));
-            pill.setForeground(new Color(190, 180, 240));
-            pill.setBorder(BorderFactory.createCompoundBorder(
-                    BorderFactory.createLineBorder(new Color(75, 55, 120), 1),
-                    BorderFactory.createEmptyBorder(2, 6, 2, 6)
-            ));
-            tagsPanel.add(pill);
+            g.dispose();
         }
-        body.add(tagsPanel);
-        body.add(Box.createVerticalStrut(6));
 
-        // Complexity Stars
-        JPanel compRow = new JPanel(new FlowLayout(FlowLayout.CENTER, 4, 0));
-        compRow.setOpaque(false);
-        JLabel compLbl = new JLabel("ALGORITHM COMPLEXITY: ");
-        compLbl.setFont(new Font("Consolas", Font.PLAIN, 10));
-        compLbl.setForeground(RetroTheme.TEXT_DIM);
-        compRow.add(compLbl);
-
-        StringBuilder sb = new StringBuilder();
-        for (int c = 0; c < 5; c++) {
-            sb.append(c < d.complexity ? "★ " : "☆ ");
+        private void drawStyledButton(Graphics2D g, Rectangle b, String label, Color c, FontMetrics fm) {
+            g.setColor(new Color(26, 16, 52));
+            g.fillRoundRect(b.x, b.y, b.width, b.height, 8, 8);
+            g.setColor(c);
+            g.setStroke(new BasicStroke(1.4f));
+            g.drawRoundRect(b.x, b.y, b.width, b.height, 8, 8);
+            int textX = b.x + (b.width - fm.stringWidth(label)) / 2;
+            int textY = b.y + (b.height + fm.getAscent() - fm.getDescent()) / 2;
+            g.drawString(label, textX, textY);
         }
-        JLabel starsLbl = new JLabel(sb.toString().trim());
-        starsLbl.setFont(new Font("Consolas", Font.BOLD, 11));
-        starsLbl.setForeground(RetroTheme.ACCENT_YELLOW);
-        compRow.add(starsLbl);
-        body.add(compRow);
 
-        hero.add(body, BorderLayout.CENTER);
+        private void drawCenteredWrappedText(Graphics2D g, String text, int x, int y, int maxW) {
+            FontMetrics fm = g.getFontMetrics();
+            String[] words = text.split(" ");
+            StringBuilder line = new StringBuilder();
+            int curY = y;
 
-        // Bottom Action Bar: Three Buttons!
-        JPanel actionsRow = new JPanel(new FlowLayout(FlowLayout.CENTER, 12, 4));
-        actionsRow.setOpaque(false);
-
-        JButton btnManual = RetroTheme.createRetroButton("📖 VIEW MANUAL", RetroTheme.BTN_DARK, RetroTheme.ACCENT_CYAN);
-        btnManual.addActionListener(e -> openManual(d.tabIndex, idx));
-
-        JButton btnLaunch = RetroTheme.createRetroButton("🚀 LAUNCH SIMULATOR", new Color(45, 20, 70), RetroTheme.ACCENT_PINK);
-        btnLaunch.addActionListener(e -> {
-            AppState.markRead(idx);
-            updateCounters();
-            parentFrame.openSimulatorTab(d.tabIndex);
-        });
-
-        JButton btnQuiz = RetroTheme.createRetroButton("❓ QUIZ ARENA", RetroTheme.BTN_DARK, RetroTheme.ACCENT_YELLOW);
-        btnQuiz.addActionListener(e -> parentFrame.showScreen(ArcadeOS.SCREEN_QUIZ));
-
-        actionsRow.add(btnManual);
-        actionsRow.add(btnLaunch);
-        actionsRow.add(btnQuiz);
-
-        hero.add(actionsRow, BorderLayout.SOUTH);
-        return hero;
+            for (String w : words) {
+                if (fm.stringWidth(line + w + " ") > maxW && line.length() > 0) {
+                    String s = line.toString().trim();
+                    g.drawString(s, x + (maxW - fm.stringWidth(s)) / 2, curY);
+                    line = new StringBuilder();
+                    curY += fm.getHeight() + 3;
+                }
+                line.append(w).append(" ");
+            }
+            if (line.length() > 0) {
+                String s = line.toString().trim();
+                g.drawString(s, x + (maxW - fm.stringWidth(s)) / 2, curY);
+            }
+        }
     }
 
-    /** Side Peeker Cards with hover animation */
-    private JPanel createPeekerCard(ArchiveCardData d, int idx, boolean isLeft) {
-        JPanel peeker = new JPanel(new BorderLayout(0, 8)) {
-            @Override
-            protected void paintComponent(Graphics g) {
-                Graphics2D g2 = (Graphics2D) g.create();
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(new Color(16, 12, 30, 210));
-                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 12, 12);
-                g2.setColor(new Color(60, 45, 90));
-                g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 12, 12);
-                g2.dispose();
-                super.paintComponent(g);
-            }
-        };
-        peeker.setOpaque(false);
-        peeker.setBorder(BorderFactory.createEmptyBorder(14, 12, 14, 12));
-        peeker.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+    private void glideToStage(int targetIdx) {
+        if (targetIdx < 0 || targetIdx >= cards.length) return;
 
-        peeker.addMouseListener(new MouseAdapter() {
+        currentStageIndex = targetIdx;
+
+        float diff = targetIdx - currentScroll;
+        while (diff < -4.0f) diff += cards.length;
+        while (diff > 4.0f)  diff -= cards.length;
+
+        targetScroll = currentScroll + diff;
+
+        if (railTimer != null && railTimer.isRunning()) {
+            railTimer.stop();
+        }
+
+        railTimer = new Timer(16, new ActionListener() {
             @Override
-            public void mouseClicked(MouseEvent e) {
-                if (!isSliding) {
-                    animateTransition(idx, isLeft ? -1 : 1);
+            public void actionPerformed(ActionEvent e) {
+                float dist = targetScroll - currentScroll;
+                if (Math.abs(dist) < 0.01f) {
+                    currentScroll = targetScroll;
+                    currentScroll = ((currentScroll % cards.length) + cards.length) % cards.length;
+                    targetScroll = currentScroll;
+                    railTimer.stop();
+                    updateStageIndicators();
+                } else {
+                    currentScroll += dist * 0.18f;
+                }
+                if (carouselCanvas != null) {
+                    carouselCanvas.repaint();
                 }
             }
         });
-
-        JLabel tagLbl = new JLabel(isLeft ? "◄ PREV: STAGE " + d.num : "STAGE " + d.num + " :NEXT ►");
-        tagLbl.setFont(new Font("Consolas", Font.BOLD, 10));
-        tagLbl.setForeground(RetroTheme.TEXT_DIM);
-        tagLbl.setHorizontalAlignment(SwingConstants.CENTER);
-        peeker.add(tagLbl, BorderLayout.NORTH);
-
-        JPanel center = new JPanel();
-        center.setOpaque(false);
-        center.setLayout(new BoxLayout(center, BoxLayout.Y_AXIS));
-
-        JLabel spriteLbl = new JLabel(new ImageIcon(getCardSprite(idx, 40)));
-        spriteLbl.setAlignmentX(Component.CENTER_ALIGNMENT);
-        center.add(spriteLbl);
-        center.add(Box.createVerticalStrut(8));
-
-        JLabel titleLbl = new JLabel("<html><center><font color='#A0A0C0'><b>" + d.title + "</b></font></center></html>");
-        titleLbl.setFont(new Font("Consolas", Font.BOLD, 11));
-        titleLbl.setAlignmentX(Component.CENTER_ALIGNMENT);
-        center.add(titleLbl);
-
-        peeker.add(center, BorderLayout.CENTER);
-
-        JLabel clickLbl = new JLabel("[ CLICK TO SELECT ]");
-        clickLbl.setFont(new Font("Consolas", Font.PLAIN, 8));
-        clickLbl.setForeground(RetroTheme.ACCENT_CYAN);
-        clickLbl.setHorizontalAlignment(SwingConstants.CENTER);
-        peeker.add(clickLbl, BorderLayout.SOUTH);
-
-        return peeker;
+        railTimer.start();
+        updateStageIndicators();
     }
 
-    private JButton createCarouselNavButton(String arrow, String tooltip) {
-        JButton btn = new JButton(arrow) {
-            @Override
-            protected void paintComponent(Graphics g) {
-                Graphics2D g2 = (Graphics2D) g.create();
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(getModel().isRollover() ? new Color(55, 32, 90) : new Color(25, 18, 45));
-                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 12, 12);
-                g2.setColor(getModel().isRollover() ? RetroTheme.ACCENT_CYAN : RetroTheme.BORDER_COLOR);
-                g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 12, 12);
-                g2.dispose();
-                super.paintComponent(g);
-            }
-        };
-        btn.setFont(new Font("Consolas", Font.BOLD, 26));
-        btn.setForeground(Color.WHITE);
-        btn.setFocusPainted(false);
-        btn.setOpaque(false);
-        btn.setContentAreaFilled(false);
-        btn.setBorder(BorderFactory.createEmptyBorder(0, 16, 0, 16));
-        btn.setToolTipText(tooltip);
-        btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        btn.addMouseListener(new MouseAdapter() {
-            @Override
-            public void mouseEntered(MouseEvent e) { btn.setForeground(RetroTheme.ACCENT_CYAN); }
-            @Override
-            public void mouseExited(MouseEvent e) { btn.setForeground(Color.WHITE); }
-        });
-        return btn;
+    private void prevStage() {
+        int next = (currentStageIndex - 1 + cards.length) % cards.length;
+        glideToStage(next);
+    }
+
+    private void nextStage() {
+        int next = (currentStageIndex + 1) % cards.length;
+        glideToStage(next);
     }
 
     private JPanel createStageIndicatorsStrip() {
@@ -634,111 +766,29 @@ public class ArchivesPanel extends JPanel {
                     super.paintComponent(g);
                 }
             };
-            pill.setFont(new Font("Consolas", Font.BOLD, 9));
+            pill.setFont(new Font("Consolas", Font.BOLD, 10));
             pill.setForeground(isActive ? Color.WHITE : new Color(160, 150, 190));
             pill.setFocusPainted(false);
             pill.setOpaque(false);
             pill.setContentAreaFilled(false);
-            pill.setBorder(BorderFactory.createEmptyBorder(4, 8, 4, 8));
+            pill.setBorder(BorderFactory.createEmptyBorder(5, 10, 5, 10));
             pill.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
             pill.addActionListener(e -> {
-                if (!isSliding) {
-                    int dir = (stageIdx > currentStageIndex) ? 1 : -1;
-                    animateTransition(stageIdx, dir);
-                    requestFocusInWindow();
-                }
+                glideToStage(stageIdx);
+                requestFocusInWindow();
             });
             pillsRow.add(pill);
         }
         strip.add(pillsRow, BorderLayout.CENTER);
 
-        JLabel hints = new JLabel("[◄ / ►] OR [A / D] CYCLE STAGES   •   [ENTER] LAUNCH SIMULATOR   •   [M] OPEN MANUAL");
-        hints.setFont(new Font("Consolas", Font.PLAIN, 9));
+        // CLEAN, ERROR-FREE KEYBOARD HINTS
+        JLabel hints = new JLabel("[A / D] CYCLE STAGES   •   [ENTER] LAUNCH SIMULATOR   •   [M] VIEW MANUAL");
+        hints.setFont(new Font("Consolas", Font.PLAIN, 10));
         hints.setForeground(RetroTheme.TEXT_DIM);
         hints.setHorizontalAlignment(SwingConstants.CENTER);
         strip.add(hints, BorderLayout.SOUTH);
 
         return strip;
-    }
-
-    private void prevStage() {
-        if (isSliding) return;
-        int next = (currentStageIndex - 1 + cards.length) % cards.length;
-        animateTransition(next, -1);
-    }
-
-    private void nextStage() {
-        if (isSliding) return;
-        int next = (currentStageIndex + 1) % cards.length;
-        animateTransition(next, 1);
-    }
-
-    /** Take snapshot of component into an offscreen image */
-    private BufferedImage captureSnapshot(JComponent comp) {
-        int w = Math.max(1, comp.getWidth());
-        int h = Math.max(1, comp.getHeight());
-        BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
-        Graphics2D g2 = img.createGraphics();
-        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-        comp.paint(g2);
-        g2.dispose();
-        return img;
-    }
-
-    /**
-     * Silky-smooth, slower cinematic sliding transition.
-     * Takes ~450ms across ~28 frames with sinusoidal ease-in-out curve.
-     */
-    private void animateTransition(int targetIdx, int direction) {
-        if (targetIdx == currentStageIndex || isSliding) return;
-
-        int w = cardsRow.getWidth();
-        int h = cardsRow.getHeight();
-        if (w <= 0 || h <= 0) {
-            // If not yet laid out, change instantly
-            currentStageIndex = targetIdx;
-            rebuildCarouselCards();
-            updateStageIndicators();
-            return;
-        }
-
-        // 1. Capture snapshot of current stage view
-        snapshotOld = captureSnapshot(cardsRow);
-
-        // 2. Temporarily switch to target stage and capture incoming snapshot
-        currentStageIndex = targetIdx;
-        rebuildCarouselCards();
-        snapshotNew = captureSnapshot(cardsRow);
-
-        // 3. Setup smooth animation parameters
-        this.slideDirection = direction;
-        this.slideProgress = 0.0f;
-        this.isSliding = true;
-
-        if (slideTimer != null && slideTimer.isRunning()) {
-            slideTimer.stop();
-        }
-
-        // Slower, graceful timer: step 0.035f at 16ms = ~28 frames = ~460 milliseconds of buttery gliding
-        slideTimer = new Timer(16, new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                slideProgress += 0.036f;
-                if (slideProgress >= 1.0f) {
-                    slideProgress = 1.0f;
-                    isSliding = false;
-                    slideTimer.stop();
-                    snapshotOld = null;
-                    snapshotNew = null;
-                    rebuildCarouselCards();
-                    updateStageIndicators();
-                }
-                if (cardsRow != null) {
-                    cardsRow.repaint();
-                }
-            }
-        });
-        slideTimer.start();
     }
 
     private void updateStageIndicators() {
@@ -752,7 +802,7 @@ public class ArchivesPanel extends JPanel {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // OPTIONAL GRID VIEW IMPLEMENTATION
+    // GRID VIEW IMPLEMENTATION
     // ─────────────────────────────────────────────────────────────────────────
 
     private JPanel createGridView() {
@@ -785,8 +835,8 @@ public class ArchivesPanel extends JPanel {
 
         JPanel topRow = new JPanel(new BorderLayout());
         topRow.setOpaque(false);
-        JLabel plus = new JLabel("✦");
-        plus.setFont(new Font("Consolas", Font.PLAIN, 10));
+        JLabel plus = new JLabel("+");
+        plus.setFont(new Font("Consolas", Font.BOLD, 12));
         plus.setForeground(RetroTheme.ACCENT_CYAN);
         topRow.add(plus, BorderLayout.WEST);
 
@@ -805,7 +855,7 @@ public class ArchivesPanel extends JPanel {
         body.add(iconLbl);
         body.add(Box.createVerticalStrut(6));
 
-        JLabel tagLbl = new JLabel("ARCHIVE FILE " + d.num);
+        JLabel tagLbl = new JLabel("ARCHIVE " + d.num);
         tagLbl.setFont(new Font("Consolas", Font.BOLD, 9));
         tagLbl.setForeground(RetroTheme.ACCENT_PINK);
         tagLbl.setAlignmentX(Component.CENTER_ALIGNMENT);
@@ -819,7 +869,7 @@ public class ArchivesPanel extends JPanel {
         body.add(titleLbl);
         body.add(Box.createVerticalStrut(4));
 
-        JLabel descLbl = new JLabel("<html><center><font color='#8C8CAA' size='2'>" + d.desc + "</font></center></html>");
+        JLabel descLbl = new JLabel("<html><center><font color='#B0B0D0' size='2'>" + d.desc + "</font></center></html>");
         descLbl.setFont(new Font("Consolas", Font.PLAIN, 9));
         descLbl.setAlignmentX(Component.CENTER_ALIGNMENT);
         body.add(descLbl);
@@ -842,7 +892,7 @@ public class ArchivesPanel extends JPanel {
         btnView.addActionListener(e -> openManual(d.tabIndex, idx));
         bottomRow.add(btnView, BorderLayout.WEST);
 
-        JLabel statusLbl = new JLabel(AppState.filesRead[idx] == 1 ? "STATUS: READ ✔" : "STATUS: UNREAD >");
+        JLabel statusLbl = new JLabel(AppState.filesRead[idx] == 1 ? "STATUS: READ" : "STATUS: UNREAD");
         statusLbl.setFont(new Font("Consolas", Font.BOLD, 9));
         statusLbl.setForeground(AppState.filesRead[idx] == 1 ? RetroTheme.ACCENT_GREEN : RetroTheme.ACCENT_PINK);
         bottomRow.add(statusLbl, BorderLayout.EAST);
@@ -880,7 +930,7 @@ public class ArchivesPanel extends JPanel {
     public void updateCounters() {
         int readCount = AppState.countFilesRead();
         if (lblFilesReadCounter != null) {
-            lblFilesReadCounter.setText(String.format("%03d / 008", readCount));
+            lblFilesReadCounter.setText(String.format("%02d / 08", readCount));
         }
         if (indexProgress != null) {
             indexProgress.setValue(readCount);
@@ -899,7 +949,7 @@ public class ArchivesPanel extends JPanel {
 
         JPanel center = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 4));
         center.setOpaque(false);
-        JLabel lblIdx = new JLabel("ARCHIVE INDEX");
+        JLabel lblIdx = new JLabel("ARCHIVE PROGRESS");
         lblIdx.setFont(new Font("Consolas", Font.BOLD, 10));
         lblIdx.setForeground(RetroTheme.TEXT_DIM);
         center.add(lblIdx);
@@ -912,26 +962,21 @@ public class ArchivesPanel extends JPanel {
         indexProgress.setBorder(BorderFactory.createLineBorder(RetroTheme.BORDER_COLOR, 1));
         center.add(indexProgress);
 
-        JLabel lblCount = new JLabel("8 STAGES");
+        JLabel lblCount = new JLabel("8 MODULES");
         lblCount.setFont(new Font("Consolas", Font.BOLD, 10));
         lblCount.setForeground(Color.WHITE);
         center.add(lblCount);
 
-        JLabel lblOnline = new JLabel("🪐 ARCADE CAROUSEL ACTIVE");
-        lblOnline.setFont(new Font("Consolas", Font.BOLD, 9));
-        lblOnline.setForeground(RetroTheme.ACCENT_YELLOW);
-        center.add(lblOnline);
-
         bar.add(center, BorderLayout.CENTER);
 
-        String userTag = String.format("> CURRENT USER: %s [SCORE: %s] [GUEST MODE]",
+        String userTag = String.format("OPERATOR: %s  |  SCORE: %s",
                 AppState.playerName, AppState.getScoreFormatted());
         JLabel lblRight = new JLabel(userTag);
         lblRight.setFont(new Font("Consolas", Font.BOLD, 9));
         lblRight.setForeground(RetroTheme.ACCENT_PINK);
         lblRight.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createLineBorder(RetroTheme.ACCENT_PINK, 1),
-                BorderFactory.createEmptyBorder(2, 8, 2, 8)
+                BorderFactory.createEmptyBorder(3, 10, 3, 10)
         ));
         bar.add(lblRight, BorderLayout.EAST);
 
