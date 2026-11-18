@@ -1,0 +1,11 @@
+{
+  "level": 1,
+  "name": "Heap Limits",
+  "cols": 24,
+  "moveMs": 150,
+  "gapFrames": 0,
+  "frameRows": 1,
+  "stack": { "enabled": false },
+  "pickups": { "malloc": { "spawnEveryMs": 0, "max": 3 } },
+  "goal": { "mallocs": 10 }
+}

@@ -1,0 +1,14 @@
+{
+  "level": 3,
+  "name": "Segment Switch",
+  "cols": 24,
+  "moveMs": 140,
+  "fromSelectedTable": true,
+  "segments": [
+    { "id": 1, "name": "Audio_Engine", "base": 6300, "limit": 300, "readOnly": false },
+    { "id": 2, "name": "Arcade_Sprites", "base": 1400, "limit": 400, "readOnly": false },
+    { "id": 3, "name": "High_Scores", "base": 4300, "limit": 500, "readOnly": true }
+  ],
+  "pickups": { "malloc": { "spawnEveryMs": 0, "max": 4 } },
+  "goal": { "mallocs": 12 }
+}

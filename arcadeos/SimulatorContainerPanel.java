@@ -18,27 +18,28 @@ public class SimulatorContainerPanel extends JPanel {
     private JLabel lblXpScore;
 
     private final String[] tabNames = {
-        "01 CPU", "02 BANKER", "03 PAGING", "04 CACHE",
-        "05 SEGMENT", "06 RAM", "07 DISK", "08 MULTIPROG"
+        "01 INVADERS CPU", "02 SPACE BANKER", "03 HOPPER PAGING", "04 MARIO CACHE",
+        "05 SNAKE SEGMENT", "06 CRANE RAM", "07 PAC-MAN DISK", "08 OVERCOOKED MULTI"
     };
 
     private final String[] tabIcons = {
-        "🕹️", "🪙", "💾", "🔄",
-        "🗺️", "🧱", "💽", "⚡"
+        "👾", "🚀", "🐸", "🍄",
+        "🐍", "🏗️", "🟡", "👨‍🍳"
     };
 
     private final String[] missionNames = {
-        "MISSION 01 CPU SCHEDULING",
-        "MISSION 02 BANKER'S ALGORITHM",
-        "MISSION 03 PAGING TRANSLATION",
-        "MISSION 04 CACHE PAGE SWAP",
-        "MISSION 05 MEMORY SEGMENTATION",
-        "MISSION 06 RAM ALLOCATION & FRAGMENTATION",
-        "MISSION 07 DISK HEAD SCHEDULING",
-        "MISSION 08 MULTIPROGRAMMING DISPATCHER"
+        "MISSION 01 SPACE INVADERS // CPU SCHEDULING",
+        "MISSION 02 SPACE SHOOT // BANKER'S ALGORITHM",
+        "MISSION 03 FRAME HOPPER // PAGING TRANSLATION",
+        "MISSION 04 SUPER MARIO // CACHE REPLACEMENT",
+        "MISSION 05 HEAP SNAKE // MEMORY SEGMENTATION",
+        "MISSION 06 CYBER CRANE ATTACK // DYNAMIC RAM ALLOCATION",
+        "MISSION 07 PAC-MAN // DISK HEAD SCHEDULING",
+        "MISSION 08 OVERCOOKED // MULTIPROGRAMMING DISPATCHER"
     };
 
     private int activeTab = 0;
+    private final Component[] simPanels = new Component[8];
 
     public SimulatorContainerPanel(ArcadeOS parent) {
         this.parentFrame = parent;
@@ -60,14 +61,18 @@ public class SimulatorContainerPanel extends JPanel {
         contentCards = new JPanel(cardLayout);
         contentCards.setOpaque(false);
 
-        contentCards.add(new CPUSchedulingPanel(), tabNames[0]);
-        contentCards.add(new BankersPanel(), tabNames[1]);
-        contentCards.add(new PagingPanel(), tabNames[2]);
-        contentCards.add(new PageReplacementPanel(), tabNames[3]);
-        contentCards.add(new SegmentationPanel(), tabNames[4]);
-        contentCards.add(new FragmentationPanel(), tabNames[5]);
-        contentCards.add(new DiskSchedulingPanel(), tabNames[6]);
-        contentCards.add(new MultiprogrammingPanel(), tabNames[7]);
+        simPanels[0] = new CPUSchedulingPanel();
+        simPanels[1] = new BankersPanel();
+        simPanels[2] = new PagingPanel();
+        simPanels[3] = new PageReplacementPanel();
+        simPanels[4] = new SegmentationPanel();
+        simPanels[5] = new FragmentationPanel();
+        simPanels[6] = new DiskSchedulingPanel();
+        simPanels[7] = new MultiprogrammingPanel();
+
+        for (int i = 0; i < 8; i++) {
+            contentCards.add(simPanels[i], tabNames[i]);
+        }
 
         add(contentCards, BorderLayout.CENTER);
 
@@ -79,94 +84,106 @@ public class SimulatorContainerPanel extends JPanel {
         getActionMap().put("ESCAPE_BACK", new AbstractAction() {
             @Override
             public void actionPerformed(ActionEvent e) {
+                if (!isShowing()) return;
                 parentFrame.showScreen(ArcadeOS.SCREEN_ARCHIVES);
             }
         });
     }
 
     private JPanel createArcadeHeader() {
-        JPanel header = new JPanel(new BorderLayout(10, 0));
-        header.setBackground(RetroTheme.PANEL_BG);
+        JPanel header = new JPanel(new BorderLayout(4, 0));
+        header.setBackground(new Color(15, 10, 26));
+        header.setPreferredSize(new Dimension(0, 44));
         header.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createMatteBorder(0, 0, 1, 0, RetroTheme.BORDER_COLOR),
-                BorderFactory.createEmptyBorder(6, 12, 6, 12)
+                BorderFactory.createMatteBorder(0, 0, 1, 0, new Color(65, 45, 95)),
+                BorderFactory.createEmptyBorder(4, 4, 4, 6)
         ));
 
         // Left Section: Mascot + M // OS + 3 mini buttons
-        JPanel left = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 2));
+        JPanel left = new JPanel(new FlowLayout(FlowLayout.LEFT, 3, 0));
         left.setOpaque(false);
-        left.add(new JLabel(new ImageIcon(PixelSprites.createRobotSprite(28))));
+        left.add(new JLabel(new ImageIcon(PixelSprites.createRobotSprite(22))));
 
         JLabel lblLogo = new JLabel("M // OS");
-        lblLogo.setFont(new Font("Consolas", Font.BOLD, 13));
+        lblLogo.setFont(new Font("Consolas", Font.BOLD, 11));
         lblLogo.setForeground(Color.WHITE);
         left.add(lblLogo);
 
-        JButton btnSw = RetroTheme.createNavButton("👤", "", RetroTheme.TEXT_WHITE);
+        JButton btnSw = RetroTheme.createNavButton("[U]", "USER", RetroTheme.TEXT_WHITE);
         btnSw.setToolTipText("Switch Player");
         btnSw.addActionListener(e -> parentFrame.showScreen(ArcadeOS.SCREEN_LOGIN));
 
-        JButton btnLb = RetroTheme.createNavButton("🏆", "", RetroTheme.ACCENT_YELLOW);
+        JButton btnLb = RetroTheme.createNavButton("[#]", "RANKS", RetroTheme.ACCENT_YELLOW);
         btnLb.setToolTipText("Leaderboard");
         btnLb.addActionListener(e -> JOptionPane.showMessageDialog(this, "Leaderboard Active", "Scores", JOptionPane.INFORMATION_MESSAGE));
 
-        JButton btnLo = RetroTheme.createNavButton("⏻", "", RetroTheme.ACCENT_PINK);
+        JButton btnLo = RetroTheme.createNavButton("[X]", "EXIT", RetroTheme.ACCENT_PINK);
         btnLo.setToolTipText("Log Out");
         btnLo.addActionListener(e -> parentFrame.showScreen(ArcadeOS.SCREEN_LOGIN));
 
         left.add(btnSw); left.add(btnLb); left.add(btnLo);
         header.add(left, BorderLayout.WEST);
 
-        // Center: 8 Arcade Module Tabs
-        JPanel tabsPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 4, 0));
+        // Center: 8 Arcade Module Cards (Game-Themed Cyber Cartridges)
+        JPanel tabsPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 3, 0));
         tabsPanel.setOpaque(false);
+
+        final String[][] tabMeta = {
+            {"01", "CPU", "INVADERS"},
+            {"02", "BANK", "SPACE"},
+            {"03", "PAGE", "HOPPER"},
+            {"04", "CACHE", "MARIO"},
+            {"05", "SEGM", "SNAKE"},
+            {"06", "RAM", "CRANE"},
+            {"07", "DISK", "PAC-MAN"},
+            {"08", "MULTI", "OVERCOOKED"}
+        };
+
+        final Color[] tabAccents = {
+            new Color(0, 225, 255),   // 01 Cyan
+            new Color(255, 160, 50),  // 02 Amber Gold
+            new Color(0, 240, 200),   // 03 Neon Mint
+            new Color(255, 80, 80),   // 04 Mario Red
+            new Color(70, 230, 120),  // 05 Snake Green
+            new Color(195, 115, 255), // 06 Cyber Violet
+            new Color(255, 220, 0),   // 07 Pacman Yellow
+            new Color(255, 65, 150)   // 08 Chef Hot Pink
+        };
+
+        final Image[] tabSprites = {
+            PixelSprites.createAlienSprite(15, tabAccents[0]),
+            PixelSprites.createSpaceShootShip(15, tabAccents[1]),
+            PixelSprites.createFrogSprite(15, tabAccents[2]),
+            PixelSprites.createMarioSprite(15),
+            PixelSprites.createShieldSprite(15, tabAccents[4]),
+            PixelSprites.createCraneSprite(15, tabAccents[5]),
+            PixelSprites.createPacman(15, 0.4f, true),
+            PixelSprites.createChefSprite(15, false)
+        };
 
         tabButtons = new JButton[tabNames.length];
         for (int i = 0; i < tabNames.length; i++) {
             final int idx = i;
-            JButton btn = new JButton(tabIcons[i] + " " + tabNames[i]) {
-                @Override
-                protected void paintComponent(Graphics g) {
-                    Graphics2D g2 = (Graphics2D) g.create();
-                    g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                    if (activeTab == idx) {
-                        g2.setColor(new Color(50, 24, 75));
-                        g2.fillRoundRect(0, 0, getWidth(), getHeight(), 6, 6);
-                        // Bottom pink underline
-                        g2.setColor(RetroTheme.ACCENT_PINK);
-                        g2.fillRect(4, getHeight() - 3, getWidth() - 8, 3);
-                    } else {
-                        g2.setColor(RetroTheme.BTN_DARK);
-                        g2.fillRoundRect(0, 0, getWidth(), getHeight(), 6, 6);
-                    }
-                    g2.dispose();
-                    super.paintComponent(g);
-                }
-            };
-            btn.setFont(new Font("Consolas", Font.BOLD, 10));
-            btn.setForeground(activeTab == i ? RetroTheme.ACCENT_CYAN : RetroTheme.TEXT_DIM);
-            btn.setFocusPainted(false);
-            btn.setOpaque(false);
-            btn.setContentAreaFilled(false);
-            btn.setBorder(BorderFactory.createEmptyBorder(6, 10, 6, 10));
-            btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-            btn.addActionListener(e -> selectTab(idx));
-
+            ArcadeTabButton btn = new ArcadeTabButton(
+                idx,
+                tabMeta[i][0],
+                tabMeta[i][1],
+                tabMeta[i][2],
+                tabAccents[i],
+                tabSprites[i],
+                this
+            );
             tabButtons[i] = btn;
             tabsPanel.add(btn);
         }
         header.add(tabsPanel, BorderLayout.CENTER);
 
-        // Right Section: XP Score Counter
-        JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 2));
+        // Right Section: XP Score Counter (Robust font, no missing coin emoji)
+        JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 4, 1));
         right.setOpaque(false);
 
-        JLabel coinIcon = new JLabel("🪙");
-        coinIcon.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 14));
-        right.add(coinIcon);
-
-        lblXpScore = new JLabel("XP SCORE " + String.format("%06d", AppState.score + 125));
-        lblXpScore.setFont(new Font("Consolas", Font.BOLD, 12));
+        lblXpScore = new JLabel("● XP " + String.format("%06d", AppState.score + 125));
+        lblXpScore.setFont(new Font("Consolas", Font.BOLD, 11));
         lblXpScore.setForeground(RetroTheme.ACCENT_YELLOW);
         right.add(lblXpScore);
 
@@ -184,7 +201,7 @@ public class SimulatorContainerPanel extends JPanel {
         left.setOpaque(false);
 
         JButton btnStageSelect = new JButton("< STAGE SELECT");
-        btnStageSelect.setFont(new Font("Consolas", Font.BOLD, 10));
+        btnStageSelect.setFont(new Font("Consolas", Font.BOLD, 11));
         btnStageSelect.setForeground(RetroTheme.ACCENT_CYAN);
         btnStageSelect.setOpaque(false);
         btnStageSelect.setContentAreaFilled(false);
@@ -194,17 +211,17 @@ public class SimulatorContainerPanel extends JPanel {
         left.add(btnStageSelect);
 
         JLabel sep = new JLabel("|");
-        sep.setFont(new Font("Consolas", Font.PLAIN, 11));
+        sep.setFont(new Font("Consolas", Font.PLAIN, 12));
         sep.setForeground(RetroTheme.BORDER_COLOR);
         left.add(sep);
 
         lblBreadcrumb = new JLabel(missionNames[0]);
-        lblBreadcrumb.setFont(new Font("Consolas", Font.BOLD, 10));
+        lblBreadcrumb.setFont(new Font("Consolas", Font.BOLD, 11));
         lblBreadcrumb.setForeground(Color.WHITE);
         left.add(lblBreadcrumb);
 
-        JButton btnOpenManual = new JButton("📖 MANUAL");
-        btnOpenManual.setFont(new Font("Consolas", Font.BOLD, 10));
+        JButton btnOpenManual = new JButton("DOCS // MANUAL");
+        btnOpenManual.setFont(new Font("Consolas", Font.BOLD, 11));
         btnOpenManual.setForeground(RetroTheme.ACCENT_YELLOW);
         btnOpenManual.setOpaque(false);
         btnOpenManual.setContentAreaFilled(false);
@@ -220,14 +237,6 @@ public class SimulatorContainerPanel extends JPanel {
         left.add(btnOpenManual);
 
         bar.add(left, BorderLayout.WEST);
-
-        // Right pill: [ GUEST MODE // READ ONLY ]
-        JLabel pill = new JLabel(AppState.isGuest ? " [ GUEST MODE // READ ONLY ] " : " [ ARCHIVIST SESSION // ACTIVE ] ");
-        pill.setFont(new Font("Consolas", Font.BOLD, 9));
-        pill.setForeground(AppState.isGuest ? new Color(200, 100, 150) : RetroTheme.ACCENT_GREEN);
-        pill.setBorder(BorderFactory.createLineBorder(AppState.isGuest ? RetroTheme.BORDER_COLOR : RetroTheme.ACCENT_GREEN, 1));
-        bar.add(pill, BorderLayout.EAST);
-
         return bar;
     }
 
@@ -271,13 +280,44 @@ public class SimulatorContainerPanel extends JPanel {
         return bar;
     }
 
+    public int getActiveTab() {
+        return activeTab;
+    }
+
+    public Component getPanel(int index) {
+        if (index >= 0 && index < simPanels.length) return simPanels[index];
+        return null;
+    }
+
+    public void loadManualExample(int manualIndex) {
+        selectTab(manualIndex);
+        if (manualIndex >= 0 && manualIndex < simPanels.length && simPanels[manualIndex] != null) {
+            Component p = simPanels[manualIndex];
+            if (p instanceof PagingPanel) ((PagingPanel) p).loadManualExample();
+            else if (p instanceof SegmentationPanel) ((SegmentationPanel) p).loadManualExample();
+        }
+    }
+
     public void selectTab(int index) {
         if (index < 0 || index >= tabNames.length) return;
+
+        // Pause other running panels if any
+        for (int i = 0; i < 8; i++) {
+            if (i != index && simPanels[i] != null) {
+                if (simPanels[i] instanceof CPUSchedulingPanel) ((CPUSchedulingPanel) simPanels[i]).pauseSimulation();
+                else if (simPanels[i] instanceof PageReplacementPanel) ((PageReplacementPanel) simPanels[i]).pauseSimulation();
+                else if (simPanels[i] instanceof DiskSchedulingPanel) ((DiskSchedulingPanel) simPanels[i]).pauseSimulation();
+                else if (simPanels[i] instanceof MultiprogrammingPanel) ((MultiprogrammingPanel) simPanels[i]).pauseSimulation();
+                else if (simPanels[i] instanceof PagingPanel) ((PagingPanel) simPanels[i]).pauseSimulation();
+                else if (simPanels[i] instanceof SegmentationPanel) ((SegmentationPanel) simPanels[i]).pauseSimulation();
+            }
+        }
+
         activeTab = index;
 
-        // Update button styles
-        for (int i = 0; i < tabButtons.length; i++) {
-            tabButtons[i].setForeground(i == activeTab ? RetroTheme.ACCENT_CYAN : RetroTheme.TEXT_DIM);
+        // Repaint all arcade tab cards
+        for (JButton b : tabButtons) {
+            if (b != null) b.repaint();
         }
 
         // Update breadcrumb
@@ -286,6 +326,140 @@ public class SimulatorContainerPanel extends JPanel {
         // Flip CardLayout
         cardLayout.show(contentCards, tabNames[index]);
         repaint();
+    }
+
+    // =========================================================================
+    // ARCADE TAB CARD BUTTON (Tactile Cyber Cartridge Micro-Card)
+    // =========================================================================
+    private static class ArcadeTabButton extends JButton {
+        private final int tabIndex;
+        private final String numStr;
+        private final String topicStr;
+        private final String gameStr;
+        private final Color accentColor;
+        private final Image iconSprite;
+        private boolean isHovered = false;
+        private final SimulatorContainerPanel container;
+
+        public ArcadeTabButton(int index, String num, String topic, String game, Color accent, Image sprite, SimulatorContainerPanel container) {
+            super();
+            this.tabIndex = index;
+            this.numStr = num;
+            this.topicStr = topic;
+            this.gameStr = game;
+            this.accentColor = accent;
+            this.iconSprite = sprite;
+            this.container = container;
+
+            setPreferredSize(new Dimension(93, 33));
+            setMinimumSize(new Dimension(88, 33));
+            setMaximumSize(new Dimension(96, 33));
+            setFocusPainted(false);
+            setOpaque(false);
+            setContentAreaFilled(false);
+            setBorder(BorderFactory.createEmptyBorder());
+            setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+            setToolTipText("Mission " + num + ": " + game + " (" + topic + ")");
+
+            addMouseListener(new MouseAdapter() {
+                @Override
+                public void mouseEntered(MouseEvent e) {
+                    isHovered = true;
+                    repaint();
+                }
+                @Override
+                public void mouseExited(MouseEvent e) {
+                    isHovered = false;
+                    repaint();
+                }
+            });
+
+            addActionListener(e -> container.selectTab(tabIndex));
+        }
+
+        @Override
+        protected void paintComponent(Graphics g) {
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+
+            int w = getWidth();
+            int h = getHeight();
+            boolean isActive = (container.getActiveTab() == tabIndex);
+
+            // 1. Background fill
+            if (isActive) {
+                GradientPaint gp = new GradientPaint(
+                        0, 0, new Color(52, 22, 74),
+                        0, h, new Color(26, 12, 42)
+                );
+                g2.setPaint(gp);
+                g2.fillRoundRect(0, 0, w, h, 7, 7);
+
+                // Top ambient glow
+                g2.setColor(new Color(accentColor.getRed(), accentColor.getGreen(), accentColor.getBlue(), 40));
+                g2.fillRoundRect(2, 2, w - 4, (h / 2) - 1, 5, 5);
+            } else if (isHovered) {
+                g2.setColor(new Color(40, 28, 62));
+                g2.fillRoundRect(0, 0, w, h, 7, 7);
+            } else {
+                g2.setColor(new Color(20, 14, 34));
+                g2.fillRoundRect(0, 0, w, h, 7, 7);
+            }
+
+            // 2. Bevel / Border
+            if (isActive) {
+                g2.setColor(accentColor);
+                g2.setStroke(new BasicStroke(1.5f));
+                g2.drawRoundRect(0, 0, w - 1, h - 1, 7, 7);
+
+                // Hot bottom neon bar with rounded ends
+                g2.setColor(accentColor);
+                g2.fillRect(3, h - 3, w - 6, 3);
+
+                // Tiny glowing active LED dot at top right
+                g2.setColor(accentColor);
+                g2.fillOval(w - 7, 4, 3, 3);
+            } else if (isHovered) {
+                g2.setColor(new Color(100, 75, 145));
+                g2.setStroke(new BasicStroke(1.0f));
+                g2.drawRoundRect(0, 0, w - 1, h - 1, 7, 7);
+            } else {
+                g2.setColor(new Color(48, 35, 72));
+                g2.setStroke(new BasicStroke(1.0f));
+                g2.drawRoundRect(0, 0, w - 1, h - 1, 7, 7);
+            }
+
+            // 3. Pixel Sprite Icon
+            if (iconSprite != null) {
+                int iconSz = 14;
+                int iconY = (h - iconSz) / 2;
+                g2.drawImage(iconSprite, 5, iconY, iconSz, iconSz, null);
+            }
+
+            // 4. Two-Tier Typography
+            // Line 1: Tag [num + topic]
+            g2.setFont(new Font("Consolas", Font.BOLD, 8));
+            g2.setColor(isActive ? accentColor : (isHovered ? accentColor : new Color(135, 120, 165)));
+            g2.drawString(numStr, 22, 11);
+
+            g2.setFont(new Font("Consolas", Font.PLAIN, 7));
+            g2.setColor(isActive ? new Color(220, 220, 240) : (isHovered ? new Color(200, 200, 220) : new Color(115, 110, 145)));
+            g2.drawString(topicStr, 33, 11);
+
+            // Line 2: Game Name
+            g2.setFont(new Font("Consolas", Font.BOLD, 9));
+            if (isActive) {
+                g2.setColor(Color.WHITE);
+            } else if (isHovered) {
+                g2.setColor(new Color(245, 245, 255));
+            } else {
+                g2.setColor(new Color(165, 160, 190));
+            }
+            g2.drawString(gameStr, 22, 24);
+
+            g2.dispose();
+        }
     }
 }
 

@@ -1,13 +1,14 @@
 package arcadeos;
 
 import java.awt.*;
+import java.awt.event.MouseEvent;
 import javax.swing.*;
 
 /**
  * Main Application Frame for ArcadeOS.
  * Coordinates transitions across:
  * 1. Screen 1: LoginPanel (Player Login / Arcade Security Gate)
- * 2. Screen 2: MainMenuPanel (Kawaii 8-Bit Arcade Edition)
+ * 2. Screen 2: MainMenuPanel (8-Bit Retro Arcade Edition)
  * 3. Screen 3: ArchivesPanel (8 Archive Cards Manuals)
  * 4. Screen 4: SimulatorContainerPanel (8 Modular Simulators)
  */
@@ -30,10 +31,11 @@ public class ArcadeOS extends JFrame {
     private QuizPanel quizPanel;
 
     public ArcadeOS() {
-        setTitle("Retro Arcade OS Prototype - MINI // OS [KAWAII 8-BIT ARCADE EDITION]");
+        setTitle("MINI // OS - 8-Bit Retro Operating System Simulator [ARCADE EDITION]");
         setSize(1280, 860);
         setMinimumSize(new Dimension(1080, 720));
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setExtendedState(JFrame.MAXIMIZED_BOTH);
         setLocationRelativeTo(null);
         getContentPane().setBackground(RetroTheme.BG_DARK);
 
@@ -74,6 +76,21 @@ public class ArcadeOS extends JFrame {
         rootCardPanel.repaint();
     }
 
+    public void loadManualExample(int manualIndex) {
+        showScreen(SCREEN_SIMULATOR);
+        if (simulatorPanel != null) {
+            simulatorPanel.loadManualExample(manualIndex);
+        }
+    }
+
+    public ArchivesPanel getArchivesPanel() {
+        return archivesPanel;
+    }
+
+    public SimulatorContainerPanel getSimulatorPanel() {
+        return simulatorPanel;
+    }
+
     public void openSimulatorTab(int tabIndex) {
         showScreen(SCREEN_SIMULATOR);
         if (simulatorPanel != null) {
@@ -87,7 +104,9 @@ public class ArcadeOS extends JFrame {
                 UIManager.setLookAndFeel(UIManager.getCrossPlatformLookAndFeelClassName());
             } catch (Exception ignored) {}
             RetroTheme.applyGlobalUIDefaults();
-            new ArcadeOS().setVisible(true);
+            ArcadeOS os = new ArcadeOS();
+            os.setExtendedState(JFrame.MAXIMIZED_BOTH);
+            os.setVisible(true);
         });
     }
 }

@@ -26,6 +26,35 @@ public class ArchiveManualData {
 
     private static final ManualEntry[] MANUALS = new ManualEntry[8];
 
+    /**
+     * Sentinel line swapped for a Java2D-drawn schematic by ArchiveManualDialog.
+     * The former ASCII box art rendered with disconnected lines and a clipped
+     * "Physical Addr" label, so the reader substitutes a vector diagram instead.
+     */
+    public static final String SEG_SCHEMATIC_MARKER = "[[SEG-MMU-SCHEMATIC]]";
+
+    private static String diagramLine(int firstColumn, String first, int secondColumn, String second) {
+        StringBuilder line = new StringBuilder();
+        while (line.length() < firstColumn) line.append(' ');
+        line.append(first);
+        while (line.length() < secondColumn) line.append(' ');
+        line.append(second);
+        return line.toString();
+    }
+
+    private static String asciiMmuDiagram() {
+        return "CPU LOGICAL ADDRESS = [   PAGE NUMBER (p) | OFFSET (d) ]\n" +
+                diagramLine(31, "|", 47, "|") + "\n" +
+                diagramLine(31, "v", 47, "|  (direct copy)") + "\n" +
+                diagramLine(23, "+---------------+", 47, "|") + "\n" +
+                diagramLine(23, "|  PAGE TABLE   |", 47, "|") + "\n" +
+                diagramLine(23, "|    p -> f     |", 47, "|") + "\n" +
+                diagramLine(23, "+---------------+", 47, "|") + "\n" +
+                diagramLine(31, "|", 47, "|") + "\n" +
+                diagramLine(31, "v", 47, "v") + "\n" +
+                "PHYSICAL RAM ADDRESS = [ FRAME NUMBER (f) | OFFSET (d) ]\n";
+    }
+
     static {
         // ─────────────────────────────────────────────────────────────────────
         // 01. CPU PROCESS SCHEDULING
@@ -87,9 +116,9 @@ public class ArchiveManualData {
             "  • Waiting Time (WT)    = TAT - BT = 7.0 - 5.0 = 2.0  (or ST - AT = 2.0)\n" +
             "\n" +
             "CRITICAL EVALUATION RULES:\n" +
-            "  ★ Arrival Gap Rule     : If CPU was idle prior, ST[i] = Arrival_Time[i].\n" +
-            "  ★ Minimum Overhead     : Context-switch time adds latency between jobs.\n" +
-            "  ★ Throughput vs Latency: Maximizing throughput may raise tail latency.",
+            "  * Arrival Gap Rule     : If CPU was idle prior, ST[i] = Arrival_Time[i].\n" +
+            "  * Minimum Overhead     : Context-switch time adds latency between jobs.\n" +
+            "  * Throughput vs Latency: Maximizing throughput may raise tail latency.",
             "╔════════════════════════════════════════════════════════════════════════╗\n" +
             "║ 3. ALGORITHM PSEUDOCODE & DISPATCH ENGINES                             ║\n" +
             "╚════════════════════════════════════════════════════════════════════════╝\n" +
@@ -138,13 +167,13 @@ public class ArchiveManualData {
             "  • J3: Arrival = 2.0, Burst = 2.0\n" +
             "\n" +
             "COMPUTATIONAL TRACE TABLE:\n" +
-            "┌────┬─────┬─────┬─────┬─────┬─────┬─────┬──────────────────────────┐\n" +
-            "│JOB │ AT  │ BT  │ ST  │ FT  │ WT  │ TAT │ STATUS / NOTES           │\n" +
-            "├────┼─────┼─────┼─────┼─────┼─────┼─────┼──────────────────────────┤\n" +
-            "│ J1 │ 0.0 │ 4.0 │ 0.0 │ 4.0 │ 0.0 │ 4.0 │ Starts immediately at t=0│\n" +
-            "│ J2 │ 1.0 │ 3.0 │ 4.0 │ 7.0 │ 3.0 │ 6.0 │ Waits from 1.0 to 4.0    │\n" +
-            "│ J3 │ 2.0 │ 2.0 │ 7.0 │ 9.0 │ 5.0 │ 7.0 │ Waits from 2.0 to 7.0    │\n" +
-            "└────┴─────┴─────┴─────┴─────┴─────┴─────┴──────────────────────────┘\n" +
+            "┌────┬─────┬─────┬─────┬─────┬─────┬─────┬───────────────────────────────┐\n" +
+            "│JOB │ AT  │ BT  │ ST  │ FT  │ WT  │ TAT │ STATUS / NOTES                │\n" +
+            "├────┼─────┼─────┼─────┼─────┼─────┼─────┼───────────────────────────────┤\n" +
+            "│ J1 │ 0.0 │ 4.0 │ 0.0 │ 4.0 │ 0.0 │ 4.0 │ Starts immediately at t=0     │\n" +
+            "│ J2 │ 1.0 │ 3.0 │ 4.0 │ 7.0 │ 3.0 │ 6.0 │ Waits from 1.0 to 4.0         │\n" +
+            "│ J3 │ 2.0 │ 2.0 │ 7.0 │ 9.0 │ 5.0 │ 7.0 │ Waits from 2.0 to 7.0         │\n" +
+            "└────┴─────┴─────┴─────┴─────┴─────┴─────┴───────────────────────────────┘\n" +
             "\n" +
             "ASCII GANTT TIMELINE:\n" +
             "0.0                 4.0                 7.0           9.0\n" +
@@ -164,13 +193,13 @@ public class ArchiveManualData {
             "│ Round Robin (RR)   │ Preemptive Quantum Q │ Fair timeshare; CS Cost    │\n" +
             "└────────────────────┴──────────────────────┴────────────────────────────┘\n" +
             "\n" +
-            "★ CONVOY EFFECT IN FCFS:\n" +
+            "* CONVOY EFFECT IN FCFS:\n" +
             "  Long CPU-bound job runs first -> short jobs wait -> low CPU/IO util.\n" +
             "\n" +
-            "★ SJF IS OPTIMAL:\n" +
+            "* SJF IS OPTIMAL:\n" +
             "  Minimizes average waiting time. (Aging mechanism prevents starvation).\n" +
             "\n" +
-            "★ ROUND ROBIN QUANTUM RULE:\n" +
+            "* ROUND ROBIN QUANTUM RULE:\n" +
             "  • If TQ is too large  -> RR degenerates into FCFS.\n" +
             "  • If TQ is too small  -> Context-switch overhead destroys throughput.\n" +
             "  • Golden Rule         -> 80% of CPU bursts should be shorter than TQ.",
@@ -195,13 +224,13 @@ public class ArchiveManualData {
             "for ones held by others.\n" +
             "\n" +
             "RESOURCE ALLOCATION GRAPH (RAG) CYCLE SCHEMATIC:\n" +
-            "┌──────────────┐      Holds Resource     ┌──────────────┐\n" +
+            "┌──────────────┐      Requests Edge      ┌──────────────┐\n" +
             "│  PROCESS P1  │ ──────────────────────> │ RESOURCE R1  │\n" +
             "└──────────────┘                         └──────────────┘\n" +
             "       ▲                                        │\n" +
-            "       │ Requests                               │ Assigned to\n" +
+            "       │ Assigned to                            │ Assigned to\n" +
             "       │                                        ▼\n" +
-            "┌──────────────┐      Holds Resource     ┌──────────────┐\n" +
+            "┌──────────────┐      Requests Edge      ┌──────────────┐\n" +
             "│ RESOURCE R2  │ <────────────────────── │  PROCESS P2  │\n" +
             "└──────────────┘                         └──────────────┘\n" +
             "\n" +
@@ -231,9 +260,9 @@ public class ArchiveManualData {
             "  • P1 Returns  : Work_new = [3, 3, 2] + Alloc[P1: 2, 0, 0] = [5, 3, 2]\n" +
             "\n" +
             "CRITICAL EVALUATION RULES:\n" +
-            "  ★ Allocation Rule      : Always return Allocation to Work, NEVER Need.\n" +
-            "  ★ Safe State Guarantee : Safe implies NO deadlock; Unsafe != Deadlock.\n" +
-            "  ★ Single-Resource RAG  : Cycle in single-instance graph = DEADLOCK.",
+            "  * Allocation Rule      : Always return Allocation to Work, NEVER Need.\n" +
+            "  * Safe State Guarantee : Safe implies NO deadlock; Unsafe != Deadlock.\n" +
+            "  * Single-Resource RAG  : Cycle in single-instance graph = DEADLOCK.",
             "╔════════════════════════════════════════════════════════════════════════╗\n" +
             "║ 3. SAFETY ALGORITHM & RESOURCE-REQUEST PSEUDOCODE                      ║\n" +
             "╚════════════════════════════════════════════════════════════════════════╝\n" +
@@ -260,7 +289,7 @@ public class ArchiveManualData {
             "│ }                                                                      │\n" +
             "└────────────────────────────────────────────────────────────────────────┘\n" +
             "\n" +
-            "COMPLEXITY: Time: O(M * N^2) | Space: O(N + M) for Work & Finish vectors",
+            "COMPLEXITY: Time: O(M * N^2) | Space: O(N + M) over Work & Finish vectors",
             "╔════════════════════════════════════════════════════════════════════════╗\n" +
             "║ 4. STEP-BY-STEP WORKED EXAMPLE & SAFE SEQUENCE                         ║\n" +
             "╚════════════════════════════════════════════════════════════════════════╝\n" +
@@ -268,13 +297,13 @@ public class ArchiveManualData {
             "\n" +
             "COMPUTATIONAL TRACE TABLE:\n" +
             "┌─────┬─────────────┬─────────────┬─────────────┬────────────────────────┐\n" +
-            "│PROC │ ALLOCATION  │     MAX     │NEED=MAX-ALOC│ STATUS IN LOOP         │\n" +
+            "│PROC │ ALLOCATION  │     MAX     │NEED (M-A)   │ STATUS IN LOOP         │\n" +
             "├─────┼─────────────┼─────────────┼─────────────┼────────────────────────┤\n" +
             "│ P0  │  0   1   0  │  7   5   3  │  7   4   3  │ Needs > Work (WAIT)    │\n" +
             "│ P1  │  2   0   0  │  3   2   2  │  1   2   2  │ [1,2,2]<=Work (RUNS)   │\n" +
             "│ P2  │  3   0   2  │  9   0   2  │  6   0   0  │ Needs > Work (WAIT)    │\n" +
             "│ P3  │  2   1   1  │  2   2   2  │  0   1   1  │ [0,1,1]<=Work (RUNS)   │\n" +
-            "│ P4  │  0   0   2  │  4   3   3  │  4   3   1  │ [4,3,1]<=Work (RUNS)   │\n" +
+            "│ P4  │  0   0   2  │  4   3   3  │  4   3   1  │ (RUNS after P1,P3)     │\n" +
             "└─────┴─────────────┴─────────────┴─────────────┴────────────────────────┘\n" +
             "\n" +
             "EXECUTION STEP SEQUENCE:\n" +
@@ -297,12 +326,12 @@ public class ArchiveManualData {
             "│ Detect & Recover   │ Periodic RAG Checks  │ High until abort occurs    │\n" +
             "└────────────────────┴──────────────────────┴────────────────────────────┘\n" +
             "\n" +
-            "★ SAFE != DEADLOCK-FREE ONLY:\n" +
+            "* SAFE != DEADLOCK-FREE ONLY:\n" +
             "  • Safe State   : Safe sequence exists; NO deadlock is possible.\n" +
             "  • Unsafe State : Deadlock possible if all jobs demand full Max claim.\n" +
             "  • Deadlock     : Closed cycle of blocked processes (subset of Unsafe).\n" +
             "\n" +
-            "★ SAFETY ALGORITHM WORK UPDATE TRAP:\n" +
+            "* SAFETY ALGORITHM WORK UPDATE TRAP:\n" +
             "  When process Pi finishes, it returns its ALLOCATION to the Work pool:\n" +
             "  Work_new = Work_current + Allocation[Pi]  (NEVER add Need!).",
             1, 1
@@ -325,54 +354,56 @@ public class ArchiveManualData {
             "identically-sized blocks called FRAMES.\n" +
             "\n" +
             "HARDWARE MMU TRANSLATION SCHEMATIC:\n" +
-            "  CPU LOGICAL ADDRESS  = [ PAGE NUMBER (p) │  OFFSET (d) ]\n" +
-            "                                │                 │\n" +
-            "                                ▼                 │ (Direct Copy)\n" +
-            "                        ┌────────────────┐        │\n" +
-            "                        │   PAGE TABLE   │        │\n" +
-            "                        │ p -> Frame (f) │        │\n" +
-            "                        └────────────────┘        │\n" +
-            "                                │                 │\n" +
-            "                                ▼                 ▼\n" +
-            "  PHYSICAL RAM ADDRESS = [ FRAME NUMBER (f)│  OFFSET (d) ]\n" +
+            asciiMmuDiagram() +
             "\n" +
             "KEY HARDWARE CHARACTERISTICS:\n" +
             "  • Pure Paging suffers NO external fragmentation whatsoever.\n" +
             "  • Internal fragmentation on final page only (avg 0.5 * Page Size).\n" +
-            "  • Translation is implemented entirely in MMU hardware for speed.",
+            "  • The MMU performs translation using a page table maintained by the OS.\n" +
+            "\n" +
+            "PAGE FAULT VS. INVALID ADDRESS:\n" +
+            "  • Page fault: Page number is in range, but valid bit = 0; the OS loads\n" +
+            "    the page from disk, updates the table, and retries the instruction.\n" +
+            "  • Invalid address: Page number is beyond the page table limit; access\n" +
+            "    is illegal and is trapped by the OS.",
             "╔════════════════════════════════════════════════════════════════════════╗\n" +
             "║ 2. MATHEMATICAL TRANSLATION FORMULAS & TLB METRICS                     ║\n" +
             "╚════════════════════════════════════════════════════════════════════════╝\n" +
             "┌─────────────────────────┬──────────────────────────────────────────────┐\n" +
             "│ PARAMETER / FORMULA     │ MATHEMATICAL DEFINITION                      │\n" +
             "├─────────────────────────┼──────────────────────────────────────────────┤\n" +
-            "│ Page Number (p)         │ p = floor(Logical_Address / Page_Size)       │\n" +
-            "│ Page Offset (d)         │ d = Logical_Address % Page_Size              │\n" +
-            "│ Physical Address (PA)   │ PA = (Frame_Number * Page_Size) + d          │\n" +
+            "│ Page Number (p)         │ p = A / S (integer division)                 │\n" +
+            "│ Page Offset (d)         │ d = A % S                                    │\n" +
+            "│ Physical Address (P)    │ P = f * S + d                                │\n" +
             "│ Total Page Table Size   │ Entries = Logical_Address_Space / Page_Size  │\n" +
             "│ Total Physical Frames   │ Frames  = Physical_RAM / Frame_Size          │\n" +
-            "│ Effective Access (EAT)  │ EAT = h*(t_tlb + t_ram) + (1-h)*(t_tlb+2*ram)│\n" +
+            "│ Effective Access (EAT)  │ EAT = h(t_tlb+t_ram) + (1-h)(t_tlb+2*t_ram)  │\n" +
             "└─────────────────────────┴──────────────────────────────────────────────┘\n" +
             "\n" +
             "CALCULATION RUNWAY (SAMPLE ADDRESS TRANSLATION):\n" +
-            "  • Given : Page Size = 4096 bytes (2^12), Logical Address = 13000\n" +
-            "  • Step 1: Page Number p = floor(13000 / 4096) = 3\n" +
-            "  • Step 2: Offset d      = 13000 % 4096 = 712 bytes\n" +
+            "  • Given : S = 4096 bytes (2^12), A = 13000\n" +
+            "  • Step 1: p = A / S = 13000 / 4096 = 3 (integer division)\n" +
+            "  • Step 2: d = A % S = 13000 % 4096 = 712 bytes\n" +
             "  • Step 3: Page Table Lookup: If PageTable[3] = Frame 7\n" +
-            "  • Step 4: PA = (7 * 4096) + 712 = 28672 + 712 = 29384 in RAM.",
+            "  • Step 4: P = f * S + d = (7 * 4096) + 712 = 29384 in RAM.",
             "╔════════════════════════════════════════════════════════════════════════╗\n" +
             "║ 3. HARDWARE TRANSLATION PSEUDOCODE                                     ║\n" +
             "╚════════════════════════════════════════════════════════════════════════╝\n" +
             "┌────────────────────────────────────────────────────────────────────────┐\n" +
-            "│ MMU ADDRESS TRANSLATION & TLB LOOKUP ENGINE                            │\n" +
+            "│ MMU ADDRESS TRANSLATION ENGINE                                         │\n" +
             "├────────────────────────────────────────────────────────────────────────┤\n" +
             "│ function translate(int logical_address, int page_size, PageTable pt) { │\n" +
             "│     int p = logical_address / page_size;                               │\n" +
             "│     int d = logical_address % page_size;                               │\n" +
-            "│     if (p >= pt.entries.length || !pt[p].valid) {                      │\n" +
-            "│         trigger_interrupt(PAGE_FAULT, p); // Demand Paging Fault       │\n" +
+            "│     if (p >= pt.entries.length) {                                      │\n" +
+            "│         trigger_trap(INVALID_ADDRESS, p);                              │\n" +
+            "│         return;                                                        │\n" +
             "│     }                                                                  │\n" +
-            "│     int f = pt[p].frameNumber;                                         │\n" +
+            "│     if (!pt.entries[p].valid) {                                        │\n" +
+            "│         trigger_interrupt(PAGE_FAULT, p); // Demand Paging Fault       │\n" +
+            "│         return;                                                        │\n" +
+            "│     }                                                                  │\n" +
+            "│     int f = pt.entries[p].frameNumber;                                 │\n" +
             "│     return (f * page_size) + d; // Physical Memory Address             │\n" +
             "│ }                                                                      │\n" +
             "└────────────────────────────────────────────────────────────────────────┘\n" +
@@ -381,23 +412,25 @@ public class ArchiveManualData {
             "╔════════════════════════════════════════════════════════════════════════╗\n" +
             "║ 4. STEP-BY-STEP WORKED EXAMPLE & PAGE TABLE MAP                        ║\n" +
             "╚════════════════════════════════════════════════════════════════════════╝\n" +
-            "PARAMETERS: Page Size = 512 bytes | Logical Address Space = 2048 bytes\n" +
+            "PARAMETERS: S = 512 bytes | Logical Address Space = 2048 bytes | A = 1040\n" +
             "\n" +
             "PAGE TABLE MAPPING & TRANSLATION TRACE:\n" +
-            "┌─────────┬─────────────┬─────────────┬───────────┬──────────────────────┐\n" +
-            "│ LOG ADDR│ PAGE NO (p) │ OFFSET (d)  │ FRAME (f) │ PHYSICAL RAM ADDR    │\n" +
-            "├─────────┼─────────────┼─────────────┼───────────┼──────────────────────┤\n" +
-            "│ 1040    │ 1040/512 = 2│ 1040%512 =16│ Frame 5   │ (5*512) + 16 = 2576  │\n" +
-            "│ 0250    │ 0250/512 = 0│ 0250%512=250│ Frame 3   │ (3*512) +250 = 1786  │\n" +
-            "│ 0700    │ 0700/512 = 1│ 0700%512=188│ Frame 1   │ (1*512) +188 =  700  │\n" +
-            "│ 1600    │ 1600/512 = 3│ 1600%512 =64│ Frame 2   │ (2*512) + 64 = 1088  │\n" +
-            "└─────────┴─────────────┴─────────────┴───────────┴──────────────────────┘\n" +
+            "┌────────┬───────────────┬───────────────┬──────────┬────────────────────┐\n" +
+            "│LOG ADDR│ PAGE NO (p)   │ OFFSET (d)    │FRAME (f) │ PHYSICAL RAM ADDR  │\n" +
+            "├────────┼───────────────┼───────────────┼──────────┼────────────────────┤\n" +
+            "│ 1040   │ 1040/512 = 2  │ 1040%512 =16  │ Frame 5  │ (5*512)+16=2576    │\n" +
+            "│ 0250   │ 0250/512 = 0  │ 0250%512=250  │ Frame 3  │ (3*512)+250=1786   │\n" +
+            "│ 0700   │ 0700/512 = 1  │ 0700%512=188  │ Frame 1  │ (1*512)+188=700    │\n" +
+            "│ 1600   │ 1600/512 = 3  │ 1600%512 =64  │ Frame 2  │ (2*512)+64=1088    │\n" +
+            "└────────┴───────────────┴───────────────┴──────────┴────────────────────┘\n" +
             "\n" +
             "STEP-BY-STEP VERIFICATION FOR LOGICAL ADDRESS 1040:\n" +
-            "  1. Page Number p = 1040 / 512 = 2 (points to Page Table Entry 2)\n" +
-            "  2. Offset d      = 1040 % 512 = 16 bytes\n" +
-            "  3. Lookup PT[2]  = Frame 5 in physical RAM\n" +
-            "  4. Physical Addr = (5 * 512) + 16 = 2560 + 16 = 2576. (VERIFIED!)",
+            "  1. p = A / S = 1040 / 512 = 2 (integer division)\n" +
+            "  2. d = A % S = 1040 % 512 = 16 bytes\n" +
+            "  3. PT[p] = PT[2] = Frame f = 5 in physical RAM\n" +
+            "  4. P = f * S + d = (5 * 512) + 16 = 2576. (VERIFIED!)\n" +
+            "  LIMIT CHECK: A=2100 -> p=2100/512=4; entries are 0-3, so 4>=4\n" +
+            "    -> INVALID ADDRESS TRAP (outside the page table).",
             "╔════════════════════════════════════════════════════════════════════════╗\n" +
             "║ 5. EXAM CHEAT-SHEET & VIRTUAL MEMORY COMPARISON MATRIX                 ║\n" +
             "╚════════════════════════════════════════════════════════════════════════╝\n" +
@@ -406,15 +439,15 @@ public class ArchiveManualData {
             "├────────────────────┼──────────────────────┼────────────────────────────┤\n" +
             "│ Contiguous Part    │ Simple hardware      │ Severe external frag       │\n" +
             "│ Pure Paging        │ No external frag     │ Internal frag on last pg   │\n" +
-            "│ Inverted Page Table│ Compact table RAM    │ Slow hash chain search     │\n" +
+            "│ Inverted PT        │ Compact table RAM    │ Slow hash chain search     │\n" +
             "│ Multi-Level Paging │ Supports 64-bit space│ 4+ memory access penalty   │\n" +
             "└────────────────────┴──────────────────────┴────────────────────────────┘\n" +
             "\n" +
-            "★ INTERNAL FRAGMENTATION IN PAGING:\n" +
+            "* INTERNAL FRAGMENTATION IN PAGING:\n" +
             "  Paging completely stops external fragmentation, but incurs internal\n" +
             "  fragmentation on the final page of a process (average 0.5 * Page Size).\n" +
             "\n" +
-            "★ OFFSET NEVER CHANGES:\n" +
+            "* OFFSET NEVER CHANGES:\n" +
             "  Logical Address = [p | d] -> Physical Address = [f | d].\n" +
             "  Offset 'd' is copied directly into physical RAM; only 'p' is translated!",
             2, 2
@@ -469,7 +502,7 @@ public class ArchiveManualData {
             "  • EAT   = (0.999 * 100 ns) + (0.001 * 10,000,000 ns)\n" +
             "  • EAT   = 99.9 ns + 10,000 ns = 10,099.9 ns (Over 100x slower!)",
             "╔════════════════════════════════════════════════════════════════════════╗\n" +
-            "║ 3. LRU & CLOCK PAGE REPLACEMENT PSEUDOCODE                             ║\n" +
+            "║ 3. LRU PAGE REPLACEMENT PSEUDOCODE                                     ║\n" +
             "╚════════════════════════════════════════════════════════════════════════╝\n" +
             "┌────────────────────────────────────────────────────────────────────────┐\n" +
             "│ ENGINE 01: LRU CACHE ENGINE (LEAST RECENTLY USED EVICTION)             │\n" +
@@ -489,7 +522,7 @@ public class ArchiveManualData {
             "│ }                                                                      │\n" +
             "└────────────────────────────────────────────────────────────────────────┘\n" +
             "\n" +
-            "COMPLEXITY: LRU: O(1) with LinkedHashSet | Clock: O(1) amortized",
+            "COMPLEXITY: LRU with LinkedHashSet: O(1) hit/update; O(1) evict.",
             "╔════════════════════════════════════════════════════════════════════════╗\n" +
             "║ 4. STEP-BY-STEP WORKED EXAMPLE (LRU, 3 FRAMES)                         ║\n" +
             "╚════════════════════════════════════════════════════════════════════════╝\n" +
@@ -497,15 +530,15 @@ public class ArchiveManualData {
             "\n" +
             "COMPUTATIONAL TRACE TABLE:\n" +
             "┌─────────┬─────────────┬─────────────┬─────────────┬────────────────────┐\n" +
-            "│ REF PAG │ FRAME 1 (F1)│ FRAME 2 (F2)│ FRAME 3 (F3)│ CACHE STATUS / EVEN│\n" +
+            "│ REF PAG │ FRAME 1 (F1)│ FRAME 2 (F2)│ FRAME 3 (F3)│ STATUS / EVENT     │\n" +
             "├─────────┼─────────────┼─────────────┼─────────────┼────────────────────┤\n" +
             "│    7    │      7      │      -      │      -      │ PAGE FAULT (Cold)  │\n" +
             "│    0    │      7      │      0      │      -      │ PAGE FAULT (Cold)  │\n" +
             "│    1    │      7      │      0      │      1      │ PAGE FAULT (Cold)  │\n" +
             "│    2    │      2      │      0      │      1      │ FAULT (7 evicted)  │\n" +
-            "│    0    │      2      │      0      │      1      │ ★ CACHE HIT!       │\n" +
+            "│    0    │      2      │      0      │      1      │ * CACHE HIT!       │\n" +
             "│    3    │      2      │      0      │      3      │ FAULT (1 evicted)  │\n" +
-            "│    0    │      2      │      0      │      3      │ ★ CACHE HIT!       │\n" +
+            "│    0    │      2      │      0      │      3      │ * CACHE HIT!       │\n" +
             "│    4    │      4      │      0      │      3      │ FAULT (2 evicted)  │\n" +
             "└─────────┴─────────────┴─────────────┴─────────────┴────────────────────┘\n" +
             "\n" +
@@ -522,7 +555,7 @@ public class ArchiveManualData {
             "│ CLOCK    │ Circular queue + Ref bit    │ Second-chance LRU approx      │\n" +
             "└──────────┴─────────────────────────────┴───────────────────────────────┘\n" +
             "\n" +
-            "★ BELADY'S ANOMALY:\n" +
+            "* BELADY'S ANOMALY:\n" +
             "  For FIFO, adding more physical frames can counter-intuitively INCREASE\n" +
             "  the number of page faults (e.g. stream 1,2,3,4,1,2,5,1,2,3,4,5).\n" +
             "  Stack Algorithms (LRU, Optimal) are mathematically immune to Belady's.",
@@ -545,18 +578,7 @@ public class ArchiveManualData {
             "logical units such as Code, Stack, Heap, and Symbol Tables.\n" +
             "\n" +
             "SEGMENTATION MMU HARDWARE TRANSLATION SCHEMATIC:\n" +
-            "  CPU Logical Address = [ Segment (s) │ Offset (d) ]\n" +
-            "                               │            │\n" +
-            "                               ▼            ├──────────────────────┐\n" +
-            "                       ┌──────────────┐     │                      │\n" +
-            "                       │SEGMENT TABLE │     │                      │\n" +
-            "                       │ Base │ Limit │     ▼                      ▼\n" +
-            "                       └──────────────┘  d < Limit?          Physical Addr\n" +
-            "                          │       │     /          \\               │\n" +
-            "                          │       └────> NO: TRAP   YES            │\n" +
-            "                          │                  (FAULT) │             │\n" +
-            "                          ▼                          ▼             ▼\n" +
-            "                  Physical RAM Base ───────────(+)─────────> [ Base + d ]",
+            SEG_SCHEMATIC_MARKER + "\n",
             "╔════════════════════════════════════════════════════════════════════════╗\n" +
             "║ 2. BOUNDS CHECKING & ADDRESS TRANSLATION EQUATIONS                     ║\n" +
             "╚════════════════════════════════════════════════════════════════════════╝\n" +
@@ -586,7 +608,7 @@ public class ArchiveManualData {
             "│     }                                                                  │\n" +
             "│     SegmentEntry e = segTable[s];                                      │\n" +
             "│     if (d < 0 || d >= e.limit) {                                       │\n" +
-            "│         raise_trap('SEGMENTATION FAULT: Offset exceeds segment limit') │\n" +
+            "│        raise_trap('SEGMENTATION FAULT: Offset exceeds segment limit'); │\n" +
             "│     }                                                                  │\n" +
             "│     return e.base + d; // Physical RAM Address                         │\n" +
             "│ }                                                                      │\n" +
@@ -601,8 +623,8 @@ public class ArchiveManualData {
             "│ SEG │ SEGMENT NAME │   BASE   │  LIMIT   │ OFFSET │ RESULT / PHYSICAL  │\n" +
             "├─────┼──────────────┼──────────┼──────────┼────────┼────────────────────┤\n" +
             "│  0  │ Main Code    │   1400   │   1000   │  420   │ Valid -> PA = 1820 │\n" +
-            "│  1  │ Call Stack   │   6300   │   0400   │  450   │ TRAP: SEG FAULT!   │\n" +
-            "│  2  │ Symbol Table │   4300   │   0500   │  080   │ Valid -> PA = 4380 │\n" +
+            "│  1  │ Call Stack   │   6300   │    400   │  450   │ TRAP: SEG FAULT!   │\n" +
+            "│  2  │ Symbol Table │   4300   │    500   │   80   │ Valid -> PA = 4380 │\n" +
             "│  3  │ Subroutines  │   3200   │   1500   │ 1500   │ TRAP: d == Limit!  │\n" +
             "└─────┴──────────────┴──────────┴──────────┴────────┴────────────────────┘\n" +
             "\n" +
@@ -624,7 +646,7 @@ public class ArchiveManualData {
             "│ Sharing/Protection │ Page access flags    │ Natural logical units      │\n" +
             "└────────────────────┴──────────────────────┴────────────────────────────┘\n" +
             "\n" +
-            "★ COMMON EXAM TRAP:\n" +
+            "* COMMON EXAM TRAP:\n" +
             "  In Paging, offset 'd' can be up to Page_Size - 1.\n" +
             "  In Segmentation, offset 'd' must be LESS THAN Limit (d < Limit)!\n" +
             "  If d == Limit, it immediately triggers a SEGMENTATION FAULT!",
@@ -719,11 +741,11 @@ public class ArchiveManualData {
             "│Next Fit  │ First Fit resuming from last│ Spreads allocations evenly    │\n" +
             "└──────────┴─────────────────────────────┴───────────────────────────────┘\n" +
             "\n" +
-            "★ BEST FIT IS NOT ALWAYS 'BEST':\n" +
+            "* BEST FIT IS NOT ALWAYS 'BEST':\n" +
             "  Counter-intuitively, Best Fit produces tiny leftover hole slivers that\n" +
             "  are too small for any other job, creating severe external frag.\n" +
             "\n" +
-            "★ KNUTH'S 50% RULE:\n" +
+            "* KNUTH'S 50% RULE:\n" +
             "  For First Fit, for every N allocated blocks, about 0.5 N blocks are lost\n" +
             "  to external fragmentation (one-third of memory may be unusable!).",
             5, 1
@@ -824,7 +846,7 @@ public class ArchiveManualData {
             "│ C-LOOK   │ Uniform wait, optimal sweep │ Circular reset jump           │\n" +
             "└──────────┴─────────────────────────────┴───────────────────────────────┘\n" +
             "\n" +
-            "★ EXAM TIP (SCAN VS LOOK):\n" +
+            "* EXAM TIP (SCAN VS LOOK):\n" +
             "  In SCAN, the head travels all the way to cylinder 0 (or max cylinder),\n" +
             "  even if there are no requests there! LOOK reverses direction immediately\n" +
             "  after serving the last request in that direction, saving head movement.",
@@ -900,13 +922,13 @@ public class ArchiveManualData {
             "\n" +
             "COMPUTATIONAL TRACE TABLE:\n" +
             "┌─────────┬─────────────┬─────────────┬─────────────┬────────────────────┐\n" +
-            "│ DEGREE N│ I/O WAIT (p)│ PROB IDLE p^│ CPU UTIL (%)│ SYSTEM EVALUATION  │\n" +
+            "│ DEGREE N│ I/O WAIT (p)│ P(IDLE)     │ CPU UTIL (%)│ SYSTEM EVALUATION  │\n" +
             "├─────────┼─────────────┼─────────────┼─────────────┼────────────────────┤\n" +
             "│    1    │ 0.80 (80%)  │ 0.8000 (80%)│ 20.00% Util │ Terrible uniprogram│\n" +
             "│    2    │ 0.80 (80%)  │ 0.6400 (64%)│ 36.00% Util │ 80% gain over N=1  │\n" +
             "│    4    │ 0.80 (80%)  │ 0.4096 (41%)│ 59.04% Util │ Solid concurrency  │\n" +
-            "│    8    │ 0.80 (80%)  │ 0.1678 (17%)│ 83.22% Util │ Optimal throughput │\n" +
-            "│   12    │ 0.80 (80%)  │ 0.0687 (07%)│ 93.13% Util │ Maximum sweet spot │\n" +
+            "│    8    │ 0.80 (80%)  │ 0.1678 (17%)│ 83.22% Util │ Strong throughput  │\n" +
+            "│   12    │ 0.80 (80%)  │ 0.0687 (07%)│ 93.13% Util │ Highest utilization│\n" +
             "└─────────┴─────────────┴─────────────┴─────────────┴────────────────────┘\n" +
             "\n" +
             "RESULT: Concurrency scales CPU utilization from 20% to over 93% without\n" +
@@ -915,21 +937,21 @@ public class ArchiveManualData {
             "║ 5. EXAM CHEAT-SHEET: THRASHING & SCHEDULER HIERARCHY                   ║\n" +
             "╚════════════════════════════════════════════════════════════════════════╝\n" +
             "┌────────────────────┬──────────────────────┬────────────────────────────┐\n" +
-            "│ SCHEDULER TIER     │ PRIMARY RESPONSIBILIT│ EXECUTION FREQUENCY        │\n" +
+            "│ SCHEDULER TIER     │ PRIMARY ROLE         │ EXECUTION FREQUENCY        │\n" +
             "├────────────────────┼──────────────────────┼────────────────────────────┤\n" +
             "│ Long-Term (Job)    │ Controls Degree of MP│ Infrequent (secs/mins)     │\n" +
             "│ Medium-Term (Swap) │ Swaps in/out of RAM  │ Intermediate (alleviate)   │\n" +
             "│ Short-Term (CPU)   │ Allocates CPU core   │ Milliseconds (frequent)    │\n" +
             "└────────────────────┴──────────────────────┴────────────────────────────┘\n" +
             "\n" +
-            "★ THE THRASHING PHENOMENON:\n" +
+            "* THE THRASHING PHENOMENON:\n" +
             "  When Degree of Multiprogramming (DOM) increases beyond available RAM:\n" +
             "  1. Processes page fault frequently as frames become scarce.\n" +
             "  2. CPU scheduler notices CPU is idle (waiting for disk page swaps).\n" +
             "  3. OS naively admits MORE processes to raise CPU load, worsening thrash!\n" +
             "  4. CPU Utilization plummets to near 0% as system spends all time paging.\n" +
             "\n" +
-            "★ WORKING SET STRATEGY (Denning):\n" +
+            "* WORKING SET STRATEGY (Denning):\n" +
             "  The Working Set WSS(i) is pages process Pi accessed in time window Δ.\n" +
             "  • If Σ WSS(i) <= Total_Frames -> System is stable and productive.\n" +
             "  • If Σ WSS(i) > Total_Frames  -> Thrashing begins! OS suspends a job.",
@@ -943,5 +965,63 @@ public class ArchiveManualData {
             return MANUALS[index];
         }
         return MANUALS[0];
+    }
+    public static void main(String[] args) {
+        String[] TAB_NAMES = {"theory", "formulas", "pseudocode", "workedExample", "cheatSheet"};
+        boolean anyError = false;
+        for (ManualEntry m : MANUALS) {
+            if (m == null) continue;
+            String[] contents = {m.theory, m.formulas, m.pseudocode, m.workedExample, m.cheatSheet};
+            for (int t = 0; t < 5; t++) {
+                // Ignore freehand diagrams that are intentionally shorter (manuals 01, 02, 05, 06, 07 Theory tab, and M01 Gantt)
+                if (t == 0) continue; // Theory tab diagrams are intentionally freehand
+                String[] lines = contents[t].split("\n");
+                for (int i = 0; i < lines.length; i++) {
+                    String line = lines[i];
+                    String trimmed = line.trim();
+                    if (t == 3 && "01".equals(m.id) && i >= 19 && i <= 21) {
+                        // M01 ASCII Gantt chart
+                        continue;
+                    }
+                    if (trimmed.startsWith("\u2554") || trimmed.startsWith("\u255a") ||  // ╔ ╚
+                        trimmed.startsWith("\u2551") ||                                   // ║
+                        trimmed.startsWith("\u250c") || trimmed.startsWith("\u2514") ||  // ┌ └
+                        trimmed.startsWith("\u251c") || trimmed.startsWith("\u2502")) {  // ├ │
+                        int len = line.length();
+                        if (len != 74) {
+                            System.out.println("MANUAL " + m.id + " / " + TAB_NAMES[t] +
+                                " / line " + (i + 1) + ": len=" + len + " -> " + line);
+                            anyError = true;
+                        }
+                    }
+                }
+            }
+        }
+        if (!anyError) {
+            System.out.println("OK: All box-drawing rows are exactly 74 characters.");
+        }
+
+        // Glyph diagnostic: check every character in all tab strings for Consolas support
+        java.awt.Font consolasFont = new java.awt.Font("Consolas", java.awt.Font.PLAIN, 12);
+        java.util.Set<Character> unsupported = new java.util.TreeSet<Character>();
+        for (ManualEntry m : MANUALS) {
+            if (m == null) continue;
+            String[] tabContents = {m.theory, m.formulas, m.pseudocode, m.workedExample, m.cheatSheet};
+            for (int t = 0; t < 5; t++) {
+                for (char ch : tabContents[t].toCharArray()) {
+                    if (ch > 127 && !consolasFont.canDisplay(ch)) {
+                        if (unsupported.add(ch)) {
+                            System.out.println("GLYPH WARNING: U+" +
+                                String.format("%04X", (int) ch) + " '" + ch +
+                                "' unsupported by Consolas in MANUAL " + m.id +
+                                " / " + TAB_NAMES[t]);
+                        }
+                    }
+                }
+            }
+        }
+        if (unsupported.isEmpty()) {
+            System.out.println("OK: All non-ASCII characters are supported by Consolas.");
+        }
     }
 }

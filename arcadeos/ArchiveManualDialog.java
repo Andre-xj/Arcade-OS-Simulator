@@ -8,7 +8,7 @@ import javax.swing.text.*;
 
 /**
  * Screen: OPERATING SYSTEM ARCHIVE SPECIFICATION MANUAL
- * Template: Capcom / Mega Man Boss Intel & Hunter Base Telemetry Database
+ * Template: PixelForge / Kernel Intel Archive Database
  *
  * Enhanced with Dynamic Horizontal Auto-Centering:
  * - Content in all 5 tabs (Theory, Formulas, Pseudocode, Worked Trace, Cheat Sheet)
@@ -35,9 +35,22 @@ public class ArchiveManualDialog extends JDialog {
 
     // Mascot floating animation
     private Timer mascotBobTimer;
+    private ScreenDim dim;
     private int bobTicks = 0;
     private float bobOffset = 0.0f;
     private JPanel telemetryCard;
+
+    // Box-drawing glyphs (─ ═ ╔ │) must render at the same advance as letters,
+    // otherwise the borders stop short of the text rows. Consolas has them at
+    // monospace width; fall back to the logical monospace font.
+    private static final String READER_FONT = pickReaderFont();
+
+    private static String pickReaderFont() {
+        for (String f : GraphicsEnvironment.getLocalGraphicsEnvironment().getAvailableFontFamilyNames()) {
+            if (f.equals("Consolas")) return "Consolas";
+        }
+        return Font.MONOSPACED;
+    }
 
     // Tab accent colors
     private final Color[] tabAccents = {
@@ -59,7 +72,7 @@ public class ArchiveManualDialog extends JDialog {
     private final String[] rawTabContents;
 
     public ArchiveManualDialog(ArcadeOS parentFrame, ArchivesPanel parentPanel, int index) {
-        super(parentFrame, "CAPCOM / KERNEL INTEL DATABASE // ARCHIVE #" + (index + 1), true);
+        super(parentFrame, "PIXELFORGE / KERNEL INTEL ARCHIVE // FILE #" + (index + 1), true);
         this.parentFrame = parentFrame;
         this.parentPanel = parentPanel;
         this.manualIndex = index;
@@ -73,14 +86,20 @@ public class ArchiveManualDialog extends JDialog {
             manual.cheatSheet
         };
 
-        setSize(840, 580);
+        setUndecorated(true);
+        setSize(RetroTheme.getClampedDialogSize(parentFrame, 900, 580));
         setResizable(false);
         setLocationRelativeTo(parentFrame);
         getContentPane().setBackground(RetroTheme.BG_DARK);
         setLayout(new BorderLayout(0, 10));
 
-        // 1. Top HUD Header Bar
-        add(createTopHeaderBar(), BorderLayout.NORTH);
+        // Neon frame replaces the native white OS title bar so the archive matches the cabinets
+        getRootPane().setBorder(BorderFactory.createLineBorder(new Color(72, 52, 112), 1));
+
+        // 1. Top HUD Header Bar (doubles as the window drag handle)
+        JPanel headerBar = createTopHeaderBar();
+        add(headerBar, BorderLayout.NORTH);
+        makeDraggable(headerBar);
 
         // 2. Center 2-Column Split (Left: Telemetry Card, Right: Centered Blueprint Terminal)
         add(createMain2ColumnContent(), BorderLayout.CENTER);
@@ -116,6 +135,72 @@ public class ArchiveManualDialog extends JDialog {
             @Override
             public void windowClosing(WindowEvent e) {
                 if (mascotBobTimer != null) mascotBobTimer.stop();
+            }
+        });
+    }
+
+    @Override
+    public void setVisible(boolean visible) {
+        if (visible && !isVisible() && getOwner() instanceof JFrame && dim == null) {
+            dim = new ScreenDim((JFrame) getOwner(), 190);
+            dim.on();
+        }
+        try {
+            super.setVisible(visible);
+        } finally {
+            if (!visible || !isVisible()) restoreOwner();
+        }
+    }
+
+    private void restoreOwner() {
+        if (dim != null) {
+            dim.off();
+            dim = null;
+        }
+    }
+
+    @Override
+    public void dispose() {
+        restoreOwner();
+        if (mascotBobTimer != null) mascotBobTimer.stop();
+        super.dispose();
+    }
+
+    private static String esc(CharSequence s) { return s.toString().replace("&", "&amp;"); }
+
+    private static String wrapHtml(String text, JComponent c, Font f, int maxPx) {
+        FontMetrics fm = c.getFontMetrics(f);
+        StringBuilder out = new StringBuilder("<html><div style='text-align:center'>");
+        StringBuilder line = new StringBuilder();
+        for (String w : text.split(" ")) {
+            String test = line.length() == 0 ? w : line + " " + w;
+            if (line.length() > 0 && fm.stringWidth(test) > maxPx) {
+                out.append(esc(line)).append("<br>");
+                line = new StringBuilder(w);
+            } else {
+                line = new StringBuilder(test);
+            }
+        }
+        return out.append(esc(line)).append("</div></html>").toString();
+    }
+
+    /** Lets the undecorated dialog be dragged by its custom header bar. */
+    private void makeDraggable(JComponent comp) {
+        final Point[] winPos = new Point[1];
+        final Point[] clickPos = new Point[1];
+        comp.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mousePressed(MouseEvent e) {
+                winPos[0] = getLocation();
+                clickPos[0] = e.getLocationOnScreen();
+            }
+        });
+        comp.addMouseMotionListener(new MouseMotionAdapter() {
+            @Override
+            public void mouseDragged(MouseEvent e) {
+                if (winPos[0] == null || clickPos[0] == null) return;
+                Point p = e.getLocationOnScreen();
+                setLocation(winPos[0].x + p.x - clickPos[0].x, winPos[0].y + p.y - clickPos[0].y);
             }
         });
     }
@@ -174,7 +259,7 @@ public class ArchiveManualDialog extends JDialog {
 
     /**
      * 2-Column Split:
-     * - Left: Capcom / Mega Man Module Telemetry Card (~300px)
+     * - Left: PixelForge module telemetry card (~300px)
      * - Right: Tactical Blueprint & Data Terminal (~740px)
      */
     private JPanel createMain2ColumnContent() {
@@ -221,7 +306,7 @@ public class ArchiveManualDialog extends JDialog {
                 g2.dispose();
             }
         };
-        telemetryCard.setPreferredSize(new Dimension(230, 0));
+        telemetryCard.setPreferredSize(new Dimension(244, 0));
         telemetryCard.setOpaque(false);
         telemetryCard.setBorder(BorderFactory.createEmptyBorder(12, 10, 12, 10));
 
@@ -294,19 +379,30 @@ public class ArchiveManualDialog extends JDialog {
         statsPanel.setLayout(new BoxLayout(statsPanel, BoxLayout.Y_AXIS));
 
         // Centered Titles in Left Card
-        JLabel titleLbl = new JLabel(manual.title);
+        JLabel titleLbl = new JLabel();
         titleLbl.setFont(new Font("Consolas", Font.BOLD, 14));
+        titleLbl.setText(wrapHtml(manual.title, titleLbl, titleLbl.getFont(), 200));
         titleLbl.setForeground(Color.WHITE);
         titleLbl.setAlignmentX(Component.CENTER_ALIGNMENT);
         titleLbl.setHorizontalAlignment(SwingConstants.CENTER);
+        titleLbl.setPreferredSize(new Dimension(214, 46));
+        titleLbl.setMinimumSize(new Dimension(214, 46));
+        titleLbl.setMaximumSize(new Dimension(214, 46));
         statsPanel.add(titleLbl);
 
-        JLabel subLbl = new JLabel(manual.subtitle);
+        // Long mission subtitles wrap onto two lines; reserve that space explicitly so
+        // BoxLayout cannot squeeze the label and clip the tail (e.g. "...DETECTION").
+        JLabel subLbl = new JLabel();
         subLbl.setFont(new Font("Consolas", Font.PLAIN, 9));
+        subLbl.setText(wrapHtml(manual.subtitle, subLbl, subLbl.getFont(), 200));
         subLbl.setForeground(RetroTheme.ACCENT_CYAN);
         subLbl.setAlignmentX(Component.CENTER_ALIGNMENT);
         subLbl.setHorizontalAlignment(SwingConstants.CENTER);
+        subLbl.setPreferredSize(new Dimension(214, 36));
+        subLbl.setMinimumSize(new Dimension(214, 36));
+        subLbl.setMaximumSize(new Dimension(214, 36));
         statsPanel.add(subLbl);
+
         statsPanel.add(Box.createVerticalStrut(8));
 
         // Data Rows
@@ -323,7 +419,10 @@ public class ArchiveManualDialog extends JDialog {
         statsPanel.add(createStatRow("SIMULATOR:", "TAB #" + (manual.simulatorTabIndex + 1), RetroTheme.ACCENT_PINK));
         statsPanel.add(Box.createVerticalStrut(4));
 
-        statsPanel.add(createStatRow("EXP REWARD:", "+50 XP EARNED", RetroTheme.ACCENT_GREEN));
+        boolean rewardClaimed = AppState.filesRead[manualIndex] == 1;
+        statsPanel.add(createStatRow("EXP REWARD:",
+                rewardClaimed ? "+50 XP CLAIMED" : "+50 XP",
+                rewardClaimed ? RetroTheme.ACCENT_GREEN : RetroTheme.ACCENT_YELLOW));
         statsPanel.add(Box.createVerticalStrut(8));
 
         // Tags Pill Area (Centered)
@@ -334,23 +433,14 @@ public class ArchiveManualDialog extends JDialog {
         statsPanel.add(lblTags);
         statsPanel.add(Box.createVerticalStrut(3));
 
-        JPanel tagsWrap = new JPanel(new FlowLayout(FlowLayout.CENTER, 3, 3));
-        tagsWrap.setOpaque(false);
-        tagsWrap.setAlignmentX(Component.CENTER_ALIGNMENT);
-        for (String t : manual.tags.split("\\|")) {
-            String clean = t.trim();
-            if (!clean.isEmpty()) {
-                JLabel pill = new JLabel(clean);
-                pill.setFont(new Font("Consolas", Font.PLAIN, 9));
-                pill.setForeground(new Color(210, 200, 255));
-                pill.setBorder(BorderFactory.createCompoundBorder(
-                        BorderFactory.createLineBorder(new Color(75, 55, 115), 1),
-                        BorderFactory.createEmptyBorder(2, 5, 2, 5)
-                ));
-                tagsWrap.add(pill);
-            }
-        }
-        statsPanel.add(tagsWrap);
+        JLabel tagsLbl = new JLabel("<html><div style='width:180px; text-align:center;'>"
+                + manual.tags.replace("&", "&amp;").replace(" | ", "&nbsp;&middot; ")
+                + "</div></html>");
+        tagsLbl.setFont(new Font("Consolas", Font.PLAIN, 9));
+        tagsLbl.setForeground(new Color(210, 200, 255));
+        tagsLbl.setAlignmentX(Component.CENTER_ALIGNMENT);
+        tagsLbl.setMaximumSize(new Dimension(190, 60));
+        statsPanel.add(tagsLbl);
 
         telemetryCard.add(statsPanel, BorderLayout.CENTER);
 
@@ -363,7 +453,7 @@ public class ArchiveManualDialog extends JDialog {
         btnSim.addActionListener(e -> {
             markManualRead();
             dispose();
-            parentFrame.openSimulatorTab(manual.simulatorTabIndex);
+            if (parentFrame != null) parentFrame.openSimulatorTab(manual.simulatorTabIndex);
         });
         actionsBox.add(btnSim);
 
@@ -372,7 +462,7 @@ public class ArchiveManualDialog extends JDialog {
         btnQuiz.addActionListener(e -> {
             markManualRead();
             dispose();
-            parentFrame.showScreen(ArcadeOS.SCREEN_QUIZ);
+            if (parentFrame != null) parentFrame.showScreen(ArcadeOS.SCREEN_QUIZ);
         });
         actionsBox.add(btnQuiz);
 
@@ -471,7 +561,20 @@ public class ArchiveManualDialog extends JDialog {
         lblSearch.setForeground(RetroTheme.ACCENT_CYAN);
         leftSearch.add(lblSearch);
 
-        txtSearch = new JTextField(18);
+        txtSearch = new JTextField(18) {
+            @Override
+            protected void paintComponent(Graphics g) {
+                super.paintComponent(g);
+                if (!getText().isEmpty()) return;
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setColor(RetroTheme.TEXT_DIM);
+                g2.setFont(getFont());
+                FontMetrics fm = g2.getFontMetrics();
+                int baseline = (getHeight() - fm.getHeight()) / 2 + fm.getAscent();
+                g2.drawString("Search notes...", getInsets().left + 2, baseline);
+                g2.dispose();
+            }
+        };
         txtSearch.setFont(new Font("Consolas", Font.PLAIN, 11));
         txtSearch.setBackground(RetroTheme.INPUT_BG);
         txtSearch.setForeground(Color.WHITE);
@@ -568,7 +671,8 @@ public class ArchiveManualDialog extends JDialog {
 
         tabTextPanes = new JTextPane[5];
         for (int i = 0; i < 5; i++) {
-            cardContainer.add(createStyledReaderView(i, rawTabContents[i], tabAccents[i]), "TAB_" + i);
+            JScrollPane reader = createStyledReaderView(i, rawTabContents[i], tabAccents[i]);
+            cardContainer.add(i == 3 ? wrapWithExampleButton(reader) : reader, "TAB_" + i);
         }
 
         JPanel centerTerminalCard = new JPanel(new BorderLayout(0, 6));
@@ -607,7 +711,7 @@ public class ArchiveManualDialog extends JDialog {
      * Implements intelligent text auto-fitting to the fixed window size:
      * - Perfectly equal margins on both sides across all tabs and all manuals.
      * - Dynamic auto-centering insets ensure left space == right space to the exact pixel.
-     * - Monospace Consolas 12 font ensures consistent 74-character cyber box alignment.
+     * - Logical monospace font keeps ASCII diagrams and code columns aligned.
      */
     private JScrollPane createStyledReaderView(int tabIdx, String rawText, Color accent) {
         // Intelligent Auto-Fit: Calculate optimal vertical centering
@@ -621,20 +725,23 @@ public class ArchiveManualDialog extends JDialog {
         int fontSize = 12;
         float lineSpacing = 0.08f;
         int topMargin = Math.max(12, Math.min(26, (380 - (int)(lineCount * 17.0f)) / 2));
+        Font readerFont = new Font(READER_FONT, Font.PLAIN, fontSize);
+        StringBuilder widthSampleBuilder = new StringBuilder(maxLineLen + 2);
+        for (int i = 0; i < maxLineLen + 2; i++) widthSampleBuilder.append('M');
+        String widthSample = widthSampleBuilder.toString();
 
         JTextPane pane = new JTextPane() {
             @Override
             public boolean getScrollableTracksViewportWidth() {
-                // Lock horizontal width to viewport: NEVER scroll horizontally!
-                return true;
+                int minW = getFontMetrics(readerFont).stringWidth(widthSample) + 24;
+                return getParent() == null || getParent().getWidth() >= minW;
             }
 
             @Override
             public Insets getInsets() {
                 // Precision horizontal auto-centering: guarantees left space == right space to the pixel
-                Font f = new Font("Consolas", Font.PLAIN, 12);
-                FontMetrics fm = getFontMetrics(f);
-                int textW = fm.stringWidth("╔════════════════════════════════════════════════════════════════════════╗");
+                FontMetrics fm = getFontMetrics(readerFont);
+                int textW = fm.stringWidth(widthSample);
                 int w = getWidth();
                 int hMargin = Math.max(12, (w - textW) / 2);
                 return new Insets(topMargin, hMargin, topMargin, hMargin);
@@ -650,12 +757,12 @@ public class ArchiveManualDialog extends JDialog {
                 return in;
             }
         };
-        pane.setFont(new Font("Consolas", Font.PLAIN, 12));
+        pane.setFont(readerFont);
         pane.setEditable(false);
         pane.setBackground(new Color(15, 11, 28));
         pane.setCaretColor(RetroTheme.ACCENT_CYAN);
 
-        populateStyledText(pane, rawText, accent, fontSize, lineSpacing);
+        populateStyledText(pane, rawText, accent, fontSize, lineSpacing, tabIdx);
         tabTextPanes[tabIdx] = pane;
 
         JScrollPane sp = new JScrollPane(pane);
@@ -664,20 +771,21 @@ public class ArchiveManualDialog extends JDialog {
                 BorderFactory.createLineBorder(new Color(55, 40, 85), 1),
                 BorderFactory.createEmptyBorder(2, 2, 2, 2)
         ));
-        // Completely disable horizontal scrolling - content is fixed in center!
-        sp.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
+        sp.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED);
         sp.getVerticalScrollBar().setUnitIncrement(18);
 
         return sp;
     }
 
-    private void populateStyledText(JTextPane pane, String text, Color accent, int fontSize, float lineSpacing) {
+    private static void populateStyledText(JTextPane pane, String text, Color accent, int fontSize,
+                                           float lineSpacing, int tabIdx) {
         StyledDocument doc = pane.getStyledDocument();
         try {
             doc.remove(0, doc.getLength());
+            boolean syntaxHighlightingEnabled = tabIdx == 2;
 
             Style def = pane.addStyle("def", null);
-            StyleConstants.setFontFamily(def, "Consolas");
+            StyleConstants.setFontFamily(def, READER_FONT);
             StyleConstants.setFontSize(def, fontSize);
             StyleConstants.setLineSpacing(def, lineSpacing);
             StyleConstants.setForeground(def, new Color(225, 225, 245));
@@ -714,17 +822,43 @@ public class ArchiveManualDialog extends JDialog {
             StyleConstants.setForeground(highlight, RetroTheme.ACCENT_YELLOW);
 
             String[] lines = text.split("\n");
-            for (String line : lines) {
+            for (int lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+                String line = lines[lineIndex];
+                // Swap the ASCII schematic sentinel for a Java2D vector diagram.
+                if (line.trim().equals(ArchiveManualData.SEG_SCHEMATIC_MARKER)) {
+                    SegSchematicPanel schematic = new SegSchematicPanel();
+                    pane.setCaretPosition(doc.getLength());
+                    pane.insertComponent(schematic);
+                    doc.insertString(doc.getLength(), "\n", def);
+                    continue;
+                }
+
+                int lineStartOffset = doc.getLength();
                 String trimmed = line.trim();
+                boolean isBorderLine = trimmed.startsWith("╔") || trimmed.startsWith("╚") ||
+                                       trimmed.startsWith("┌") || trimmed.startsWith("└") ||
+                                       trimmed.startsWith("├") || trimmed.startsWith("║") ||
+                                       trimmed.startsWith("│");
 
                 if (trimmed.startsWith("╔") || trimmed.startsWith("╚") || trimmed.startsWith("┌") ||
                     trimmed.startsWith("└") || trimmed.startsWith("├")) {
                     doc.insertString(doc.getLength(), line + "\n", box);
                 } else if (trimmed.startsWith("║")) {
-                    doc.insertString(doc.getLength(), line + "\n", head);
+                    int firstPipe = line.indexOf('║');
+                    int lastPipe = line.lastIndexOf('║');
+                    if (firstPipe >= 0 && lastPipe > firstPipe) {
+                        if (firstPipe > 0) doc.insertString(doc.getLength(), line.substring(0, firstPipe), def);
+                        doc.insertString(doc.getLength(), "║", box);
+                        doc.insertString(doc.getLength(), line.substring(firstPipe + 1, lastPipe), head);
+                        doc.insertString(doc.getLength(), "║\n", box);
+                    } else {
+                        appendHeaderRow(doc, line, box, head);
+                        doc.insertString(doc.getLength(), "\n", def);
+                    }
                 } else if (trimmed.startsWith("│")) {
                     // Check if table header
-                    if (trimmed.contains("METRIC NAME") || trimmed.contains("CRITERIA") ||
+                    if (isTableHeaderRow(lines, lineIndex) ||
+                        trimmed.contains("METRIC NAME") || trimmed.contains("CRITERIA") ||
                         trimmed.contains("ALLOCATION") || trimmed.contains("REF PAG") ||
                         trimmed.contains("ALGORITHM") || trimmed.contains("ARCHITECTURAL FACT") ||
                         trimmed.contains("JOB │") || trimmed.contains("PROC│") ||
@@ -733,7 +867,8 @@ public class ArchiveManualDialog extends JDialog {
                         trimmed.contains("MEMORY ARCHITECTURE") || trimmed.contains("HARDWARE CHECK") ||
                         trimmed.contains("MEMORY MODEL") || trimmed.contains("DEGREE N") ||
                         trimmed.contains("SCHEDULER TIER") || trimmed.contains("STEP │")) {
-                        doc.insertString(doc.getLength(), line + "\n", metric);
+                        appendHeaderRow(doc, line, box, metric);
+                        doc.insertString(doc.getLength(), "\n", def);
                     } else {
                         // Data row or Cyber Code Box
                         String[] cols = line.split("│", -1);
@@ -749,12 +884,7 @@ public class ArchiveManualDialog extends JDialog {
                                 innerTrim.startsWith("LRU") || innerTrim.startsWith("CLOCK") ||
                                 innerTrim.startsWith("SEGMENTATION")) {
                                 doc.insertString(doc.getLength(), inner, head);
-                            } else if (inner.contains("function ") || inner.contains("for ") ||
-                                       inner.contains("if ") || inner.contains("while ") ||
-                                       inner.contains("return ") || inner.contains("int ") ||
-                                       inner.contains("double ") || inner.contains("boolean ") ||
-                                       inner.contains("//") || inner.contains("new ") ||
-                                       inner.contains("Work =") || inner.contains("SafeSequence")) {
+                            } else if (syntaxHighlightingEnabled) {
                                 // Tokenize code line inside cyber box
                                 int commentIdx = inner.indexOf("//");
                                 String codePart = (commentIdx >= 0) ? inner.substring(0, commentIdx) : inner;
@@ -808,11 +938,12 @@ public class ArchiveManualDialog extends JDialog {
                     }
                 } else if (trimmed.startsWith("//")) {
                     doc.insertString(doc.getLength(), line + "\n", comment);
-                } else if (trimmed.contains("function ") || trimmed.contains("schedule_") ||
+                } else if (syntaxHighlightingEnabled &&
+                           (trimmed.contains("function ") || trimmed.contains("schedule_") ||
                            trimmed.contains("while ") || trimmed.contains("for ") ||
                            trimmed.contains("if ") || trimmed.contains("return ") ||
                            trimmed.contains("sort_") || trimmed.contains("Work =") ||
-                           trimmed.contains("SafeSequence")) {
+                           trimmed.contains("SafeSequence"))) {
                     // Tokenized syntax highlighting for code lines
                     int commentIdx = line.indexOf("//");
                     String codePart = (commentIdx >= 0) ? line.substring(0, commentIdx) : line;
@@ -842,7 +973,7 @@ public class ArchiveManualDialog extends JDialog {
                         doc.insertString(doc.getLength(), commentPart, comment);
                     }
                     doc.insertString(doc.getLength(), "\n", def);
-                } else if (trimmed.startsWith("★")) {
+                } else if (trimmed.startsWith("*")) {
                     doc.insertString(doc.getLength(), line + "\n", head);
                 } else if (line.contains("COMPLEXITY:") || line.contains("CRITERIA:") ||
                            line.contains("CALCULATION") || line.contains("STEP-BY-STEP") ||
@@ -852,12 +983,79 @@ public class ArchiveManualDialog extends JDialog {
                 } else {
                     doc.insertString(doc.getLength(), line + "\n", def);
                 }
+
+                if (isBorderLine) {
+                    int firstBorder = -1;
+                    for (int i = 0; i < line.length(); i++) {
+                        char ch = line.charAt(i);
+                        if ("╔╚┌└├║│".indexOf(ch) >= 0) {
+                            firstBorder = i;
+                            break;
+                        }
+                    }
+                    int lastBorder = -1;
+                    for (int i = line.length() - 1; i >= 0; i--) {
+                        char ch = line.charAt(i);
+                        if ("╔╚┌└├║│╗╝┐┘┤".indexOf(ch) >= 0) {
+                            lastBorder = i;
+                            break;
+                        }
+                    }
+                    if (firstBorder >= 0) {
+                        doc.setCharacterAttributes(lineStartOffset + firstBorder, 1, box, true);
+                    }
+                    if (lastBorder >= 0) {
+                        doc.setCharacterAttributes(lineStartOffset + lastBorder, 1, box, true);
+                    }
+                }
             }
 
             pane.setCaretPosition(0);
         } catch (Exception e) {
             pane.setText(text);
         }
+    }
+
+    private static boolean isTableHeaderRow(String[] lines, int lineIndex) {
+        if (lineIndex <= 0 || lineIndex + 1 >= lines.length) return false;
+        String current = lines[lineIndex].trim();
+        return current.startsWith("│")
+                && lines[lineIndex - 1].trim().startsWith("┌")
+                && lines[lineIndex + 1].trim().startsWith("├")
+                && lines[lineIndex].split("│", -1).length >= 4;
+    }
+
+    private static void appendHeaderRow(StyledDocument doc, String line, Style border, Style text)
+            throws BadLocationException {
+        for (int i = 0; i < line.length(); i++) {
+            String character = line.substring(i, i + 1);
+            doc.insertString(doc.getLength(), character,
+                    character.equals("│") || character.equals("║") ? border : text);
+        }
+    }
+
+    /** Wraps the Worked Trace reader with a shortcut that hands the example to the simulator. */
+    private JPanel wrapWithExampleButton(JScrollPane reader) {
+        JPanel wrap = new JPanel(new BorderLayout(0, 6));
+        wrap.setOpaque(false);
+        wrap.add(reader, BorderLayout.CENTER);
+
+        JButton btnLoad = RetroTheme.createRetroButton("LOAD THIS EXAMPLE INTO SIMULATOR",
+                new Color(20, 40, 52), RetroTheme.ACCENT_CYAN);
+        btnLoad.setFont(new Font("Consolas", Font.BOLD, 10));
+        btnLoad.addActionListener(e -> {
+            markManualRead();
+            dispose();
+            if (parentFrame != null) {
+                parentFrame.loadManualExample(manualIndex);
+            }
+        });
+
+        JPanel bar = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
+        bar.setOpaque(false);
+        bar.add(btnLoad);
+        wrap.add(bar, BorderLayout.SOUTH);
+        return wrap;
     }
 
     private void copyCurrentNotes() {
@@ -880,7 +1078,13 @@ public class ArchiveManualDialog extends JDialog {
             return;
         }
 
-        String content = pane.getText().toLowerCase();
+        Document document = pane.getDocument();
+        String content;
+        try {
+            content = document.getText(0, document.getLength()).toLowerCase();
+        } catch (BadLocationException ex) {
+            return;
+        }
         String query = kw.toLowerCase();
         int idx = 0;
         int count = 0;
@@ -901,7 +1105,7 @@ public class ArchiveManualDialog extends JDialog {
 
     private void showToast(String msg) {
         if (lblStatusToast != null) {
-            lblStatusToast.setText("✔ " + msg);
+            lblStatusToast.setText("[OK] " + msg);
             Timer t = new Timer(3000, e -> lblStatusToast.setText(""));
             t.setRepeats(false);
             t.start();
@@ -918,8 +1122,8 @@ public class ArchiveManualDialog extends JDialog {
         lblLeft.setForeground(RetroTheme.TEXT_DIM);
         footer.add(lblLeft, BorderLayout.WEST);
 
-        String userTag = String.format("OPERATOR: %s  |  HI-SCORE: %s PTS",
-                AppState.playerName, AppState.getScoreFormatted());
+        int stageScore = AppState.filesRead[manualIndex] == 1 ? 50 : 0;
+        String userTag = String.format("STAGE SCORE: %06d XP", stageScore);
         JLabel lblRight = new JLabel(userTag);
         lblRight.setFont(new Font("Consolas", Font.BOLD, 10));
         lblRight.setForeground(RetroTheme.ACCENT_PINK);
@@ -963,7 +1167,7 @@ public class ArchiveManualDialog extends JDialog {
     }
 
     private void markManualRead() {
-        if (AppState.filesRead[manualIndex] == 0) {
+        if (!AppState.isGuest && AppState.filesRead[manualIndex] == 0) {
             AppState.markRead(manualIndex);
             AppState.addScore(50);
             if (parentPanel != null) {
@@ -986,11 +1190,128 @@ public class ArchiveManualDialog extends JDialog {
         return 3;
     }
 
+    /**
+     * Java2D vector rendering of the Segmentation MMU address-translation flow.
+     * Replaces the former ASCII box art, whose lines failed to connect and whose
+     * "Physical Addr" label clipped off the right edge.
+     */
+    private static class SegSchematicPanel extends JPanel {
+        private static final Color BG     = new Color(15, 11, 28);
+        private static final Color FRAME  = new Color(115, 95, 175);
+        private static final Color BOX_BG = new Color(24, 18, 44);
+        private static final Color CYAN   = RetroTheme.ACCENT_CYAN;
+        private static final Color PINK   = RetroTheme.ACCENT_PINK;
+        private static final Color GREEN  = new Color(120, 240, 160);
+        private static final Color RED    = new Color(255, 92, 122);
+        private static final Color DIM    = new Color(175, 168, 200);
+        private static final Font F_CELL  = new Font("Consolas", Font.BOLD, 12);
+        private static final Font F_TITLE = new Font("Consolas", Font.BOLD, 11);
+        private static final Font F_SMALL = new Font("Consolas", Font.PLAIN, 10);
+        private static final Font F_TINY  = new Font("Consolas", Font.PLAIN, 9);
+        private static final Font F_TAG   = new Font("Consolas", Font.BOLD, 11);
+
+        SegSchematicPanel() {
+            setOpaque(true);
+            setBackground(BG);
+            Dimension d = new Dimension(500, 300);
+            setPreferredSize(d);
+            setMinimumSize(d);
+            setMaximumSize(d);
+        }
+
+        @Override
+        protected void paintComponent(Graphics g) {
+            super.paintComponent(g);
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+
+            // Row 1: CPU logical address = [ segment selector | offset ]
+            box(g2, 10, 8, 480, 40, BOX_BG, FRAME);
+            g2.setColor(FRAME);
+            g2.drawLine(250, 12, 250, 44);
+            center(g2, "SEGMENT (s)", 130, 32, F_CELL, Color.WHITE);
+            center(g2, "OFFSET (d)", 370, 32, F_CELL, Color.WHITE);
+
+            // Row 2: segment table (base + limit) and the bounds-check decision
+            box(g2, 30, 76, 200, 50, BOX_BG, FRAME);
+            center(g2, "SEGMENT TABLE", 130, 96, F_TITLE, CYAN);
+            center(g2, "Base  |  Limit", 130, 116, F_SMALL, DIM);
+
+            box(g2, 270, 76, 200, 50, BOX_BG, FRAME);
+            center(g2, "d < Limit ?", 370, 106, F_CELL, CYAN);
+
+            // Row 3: trap outcome and the translated physical address
+            box(g2, 270, 168, 200, 44, new Color(46, 14, 22), RED);
+            center(g2, "NO -> SEGMENTATION FAULT", 370, 188, F_SMALL, RED);
+            center(g2, "(HARDWARE TRAP)", 370, 204, F_TINY, RED);
+
+            box(g2, 90, 246, 380, 44, new Color(14, 40, 34), GREEN);
+            center(g2, "PHYSICAL ADDRESS = Base + d", 280, 273, F_CELL, GREEN);
+
+            // Wiring (orthogonal boxes-and-arrows)
+            wire(g2, PINK,  130, 48, 130, 76);
+            wire(g2, PINK,  370, 48, 370, 76);
+            wire(g2, DIM,   230, 101, 270, 101);
+            wire(g2, RED,   370, 126, 370, 168);
+            wire(g2, GREEN, 60, 126, 60, 268, 90, 268);
+            wire(g2, GREEN, 470, 101, 488, 101, 488, 268, 470, 268);
+
+            g2.setFont(F_TAG);
+            g2.setColor(DIM);
+            g2.drawString("Limit", 234, 97);
+            g2.setColor(RED);
+            g2.drawString("NO", 378, 148);
+            g2.setColor(GREEN);
+            g2.drawString("YES", 474, 96);
+            g2.drawString("Base", 32, 205);
+
+            g2.dispose();
+        }
+
+        private static void box(Graphics2D g2, int x, int y, int w, int h, Color fill, Color border) {
+            g2.setColor(fill);
+            g2.fillRoundRect(x, y, w, h, 8, 8);
+            g2.setColor(border);
+            g2.setStroke(new BasicStroke(1.6f));
+            g2.drawRoundRect(x, y, w, h, 8, 8);
+        }
+
+        private static void center(Graphics2D g2, String s, int cx, int baseline, Font f, Color c) {
+            g2.setFont(f);
+            g2.setColor(c);
+            FontMetrics fm = g2.getFontMetrics();
+            g2.drawString(s, cx - fm.stringWidth(s) / 2, baseline);
+        }
+
+        /** Draws an orthogonal polyline and an arrow head at its final point. */
+        private static void wire(Graphics2D g2, Color c, int... pts) {
+            g2.setColor(c);
+            g2.setStroke(new BasicStroke(1.8f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+            for (int i = 0; i + 3 < pts.length; i += 2) {
+                g2.drawLine(pts[i], pts[i + 1], pts[i + 2], pts[i + 3]);
+            }
+            int n = pts.length;
+            int ex = pts[n - 2], ey = pts[n - 1];
+            int px = pts[n - 4], py = pts[n - 3];
+            double angle = Math.atan2(ey - py, ex - px);
+            int s = 7;
+            Polygon head = new Polygon();
+            head.addPoint(ex, ey);
+            head.addPoint((int) Math.round(ex - s * Math.cos(angle - Math.PI / 6)),
+                          (int) Math.round(ey - s * Math.sin(angle - Math.PI / 6)));
+            head.addPoint((int) Math.round(ex - s * Math.cos(angle + Math.PI / 6)),
+                          (int) Math.round(ey - s * Math.sin(angle + Math.PI / 6)));
+            g2.setColor(c);
+            g2.fillPolygon(head);
+        }
+    }
+
     private Image getSpriteForManual(int idx, int sz) {
         switch (idx) {
             case 0: return PixelSprites.createAlienSprite(sz, new Color(170, 90, 255));
             case 1: return PixelSprites.createCanSprite(sz, new Color(255, 100, 130));
-            case 2: return PixelSprites.createUfoSprite(sz, new Color(5, 217, 232));
+            case 2: return PixelSprites.createFrogSprite(sz, new Color(40, 255, 200));
             case 3: return PixelSprites.createGhostSprite(sz, new Color(255, 220, 240));
             case 4: return PixelSprites.createShieldSprite(sz, new Color(70, 160, 255));
             case 5: return PixelSprites.createBrickSprite(sz);

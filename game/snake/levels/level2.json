@@ -1,0 +1,11 @@
+{
+  "level": 2,
+  "name": "Growing Stack",
+  "cols": 24,
+  "moveMs": 140,
+  "gapFrames": 6,
+  "frameRows": 1,
+  "stack": { "enabled": true, "pushEveryMs": 8000, "pushRows": 1, "returnPops": 2, "returnCooldownMs": 4000 },
+  "pickups": { "malloc": { "spawnEveryMs": 2500, "max": 3 } },
+  "goal": { "surviveSec": 60 }
+}

@@ -1,0 +1,16 @@
+# Compiled Bytecode & Output Directories
+*.class
+bin/
+out/
+build/
+
+# IDE & Editor Metadata
+.vscode/
+.idea/
+*.iml
+*.iws
+
+# OS Metadata
+.DS_Store
+Thumbs.db
+desktop.ini

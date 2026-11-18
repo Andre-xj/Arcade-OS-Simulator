@@ -108,10 +108,10 @@ public class QuizPanel extends JPanel {
         lblSelect.setForeground(RetroTheme.TEXT_DIM);
         modRow.add(lblSelect);
 
-        btnModCpu = createSelectBtn("🕹️ 01 CPU SCHED", 0);
-        btnModBanker = createSelectBtn("🪙 02 BANKER", 1);
-        btnModPaging = createSelectBtn("💾 03 PAGING", 2);
-        btnModCache = createSelectBtn("🔄 04 CACHE SWAP", 3);
+        btnModCpu = createSelectBtn("🕹️ 01 INVADERS CPU", 0);
+        btnModBanker = createSelectBtn("🪙 02 MINES BANKER", 1);
+        btnModPaging = createSelectBtn("💾 03 TETRIS PAGING", 2);
+        btnModCache = createSelectBtn("🔄 04 MARIO CACHE", 3);
 
         modRow.add(btnModCpu);
         modRow.add(btnModBanker);

@@ -8,9 +8,9 @@ import java.util.List;
 import javax.swing.*;
 
 /**
- * KERNEL TAPPER // CPU DISPATCH RUNWAY
+ * KERNEL TAPPER // 4-LANE CPU DISPATCH RUNWAY
  * -------------------------------------------------------------
- * Retro 16-Bit Arcade Scheduling Game inspired by 1983 Bally Midway Tapper.
+ * Premium 16-Bit Retro Arcade Scheduling Cabinet.
  * Features 4 distinct scheduling algorithm modes:
  * - FCFS: First-Come, First-Served (Strict Arrival Queue order)
  * - SJF: Shortest Job First (Greedy Non-Preemptive based on Burst Time)
@@ -21,12 +21,13 @@ public class KernelTapperDialog extends JDialog {
 
     public enum AlgoMode {
         FCFS("FCFS", "FIRST-COME, FIRST-SERVED",
-                "Serve aliens in strict arrival order (AT). Beware the Convoy Effect!"),
-        SJF("SJF", "SHORTEST JOB FIRST", "Non-preemptive: Serve the alien with the smallest Burst Time (BT) first!"),
+                "Serve aliens in strict arrival order (AT). Target the frontmost/oldest creep!"),
+        SJF("SJF", "SHORTEST JOB FIRST",
+                "Non-preemptive: Target the alien with the smallest Burst Time (HP) first!"),
         SRT("SRT", "SHORTEST REMAINING TIME",
-                "Preemptive: If a new alien with shorter remaining BT arrives, switch immediately!"),
+                "Preemptive: If an alien with shorter remaining HP arrives, switch targets immediately!"),
         ROUND_ROBIN("ROUND ROBIN", "ROUND ROBIN (Q=1.5s)",
-                "Time-shared: Each slice gives 1.5s CPU. Unfinished aliens push back to queue!");
+                "Time-shared: Each slice gives 1.5s CPU. Unfinished aliens push back into queue!");
 
         public final String code;
         public final String title;
@@ -39,26 +40,29 @@ public class KernelTapperDialog extends JDialog {
         }
     }
 
-    // Lane definitions (4 runways)
-    private static final int NUM_LANES = 4;
-    private static final int LANE_Y_START = 150;
-    private static final int LANE_HEIGHT = 90;
-    private static final int COUNTER_X = 140;
-    private static final int RUNWAY_END_X = 890;
+    // Lane definitions (3 spacious glowing maglev runways)
+    private static final int NUM_LANES = 3;
+    private static final int LANE_Y_START = 85;
+    private static final int LANE_HEIGHT = 124;
+    private static final int COUNTER_X = 145;
+    private static final int RUNWAY_END_X = 910;
 
     private AlgoMode currentMode;
     private List<CPUSchedulingPanel.SimJob> sourceJobs;
     private ArcadeCanvas canvas;
     private javax.swing.Timer gameTimer;
+    private JButton[] algoTabs = new JButton[4];
 
     // Game Simulation State
     private int playerLane = 0; // 0 to 3
     private int lives = 3;
     private int score = 0;
+    private int faultCount = 0; // 3 Policy Faults = -1 Core Damage!
     private double simTime = 0.0;
+    private int animTick = 0;
     private boolean isGameOver = false;
     private boolean isVictory = false;
-    private String feedbackBanner = "MISSION READY: DISPATCH RUNWAY INITIALIZED";
+    private String feedbackBanner = "MISSION READY: 3-LANE CPU RUNWAY INITIALIZED // ARMED";
     private Color bannerColor = RetroTheme.ACCENT_CYAN;
     private int bannerTimer = 0;
 
@@ -66,11 +70,12 @@ public class KernelTapperDialog extends JDialog {
     private List<AlienRunner> aliens = new ArrayList<>();
     private List<EnergyBolt> bolts = new ArrayList<>();
     private List<Particle> particles = new ArrayList<>();
+    private List<ClickPing> clickPings = new ArrayList<>();
     private BufferedImage playerSprite;
 
     public KernelTapperDialog(JFrame parent, String initialAlgo, List<CPUSchedulingPanel.SimJob> customJobs) {
-        super(parent, "CAPCOM // KERNEL TAPPER: CPU DISPATCH RUNWAY", true);
-        setSize(960, 680);
+        super(parent, "CAPCOM // KERNEL TAPPER: 3-LANE CPU DISPATCH RUNWAY", true);
+        setSize(1020, 690);
         setResizable(false);
         setLocationRelativeTo(parent);
         getContentPane().setBackground(RetroTheme.BG_DARK);
@@ -80,7 +85,7 @@ public class KernelTapperDialog extends JDialog {
         this.currentMode = parseAlgo(initialAlgo);
         this.playerSprite = PixelSprites.createPlayerSprite(36);
 
-        // 1. Top HUD Header
+        // 1. Top Arcade Marquee Header
         add(createTopControlHeader(), BorderLayout.NORTH);
 
         // 2. Main Arcade Canvas
@@ -145,50 +150,87 @@ public class KernelTapperDialog extends JDialog {
             protected void paintComponent(Graphics g) {
                 super.paintComponent(g);
                 Graphics2D g2 = (Graphics2D) g.create();
-                g2.setColor(new Color(24, 16, 44));
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                // Dark glass header with subtle gradient
+                GradientPaint gp = new GradientPaint(0, 0, new Color(26, 18, 48), 0, getHeight(), new Color(16, 12, 32));
+                g2.setPaint(gp);
                 g2.fillRect(0, 0, getWidth(), getHeight());
-                g2.setColor(new Color(65, 45, 95));
+                g2.setColor(new Color(75, 50, 110));
                 g2.drawLine(0, getHeight() - 1, getWidth(), getHeight() - 1);
                 g2.dispose();
             }
         };
         bar.setOpaque(false);
-        bar.setBorder(BorderFactory.createEmptyBorder(8, 14, 8, 14));
+        bar.setBorder(BorderFactory.createEmptyBorder(6, 16, 6, 16));
 
-        // Left Tag
+        // Left Arcade Title Badge
         JPanel left = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
         left.setOpaque(false);
-        JLabel titleLbl = new JLabel("KERNEL TAPPER // CPU RUNWAY");
+        JLabel icon = new JLabel(RetroIcons.createPlayIcon(14, RetroTheme.ACCENT_PINK));
+        JLabel titleLbl = new JLabel("KERNEL TAPPER // 16-BIT ARCADE");
         titleLbl.setFont(new Font("Consolas", Font.BOLD, 13));
         titleLbl.setForeground(RetroTheme.ACCENT_YELLOW);
+        left.add(icon);
         left.add(titleLbl);
 
-        // Algorithm Switch Tabs (Strictly Separate Modes!)
-        JPanel tabs = new JPanel(new FlowLayout(FlowLayout.CENTER, 4, 0));
+        // Algorithm Switch Tabs (Symmetrical Tactile Buttons with Active Glow)
+        JPanel tabs = new JPanel(new FlowLayout(FlowLayout.CENTER, 6, 0));
         tabs.setOpaque(false);
-        for (AlgoMode m : AlgoMode.values()) {
-            JButton btn = RetroTheme.createRetroButton(m.code, RetroTheme.BTN_DARK, RetroTheme.TEXT_WHITE);
-            btn.setFont(new Font("Consolas", Font.BOLD, 10));
+        AlgoMode[] modes = AlgoMode.values();
+        for (int i = 0; i < modes.length; i++) {
+            AlgoMode m = modes[i];
+            JButton btn = new JButton(m.code) {
+                @Override
+                protected void paintComponent(Graphics g) {
+                    Graphics2D g2 = (Graphics2D) g.create();
+                    g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                    boolean isCur = (currentMode == m);
+                    Color bg = isCur ? new Color(75, 30, 110) : new Color(28, 20, 50);
+                    Color border = isCur ? RetroTheme.ACCENT_CYAN : new Color(70, 50, 100);
+                    g2.setColor(bg);
+                    g2.fillRoundRect(0, 0, getWidth(), getHeight(), 6, 6);
+                    g2.setColor(border);
+                    g2.setStroke(new BasicStroke(isCur ? 2.0f : 1.0f));
+                    g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 6, 6);
+                    g2.dispose();
+                    super.paintComponent(g);
+                }
+            };
+            btn.setFont(new Font("Consolas", Font.BOLD, 11));
+            btn.setForeground(Color.WHITE);
+            btn.setContentAreaFilled(false);
+            btn.setBorderPainted(false);
+            btn.setFocusPainted(false);
+            btn.setPreferredSize(new Dimension(m == AlgoMode.ROUND_ROBIN ? 110 : 64, 28));
             btn.addActionListener(e -> {
                 this.currentMode = m;
+                updateAlgoButtons();
                 resetGameSession();
                 canvas.requestFocusInWindow();
             });
+            algoTabs[i] = btn;
             tabs.add(btn);
         }
 
-        // Right HUD stats
-        JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 12, 0));
+        // Right HUD Telemetry Pods (Symmetrical Glass Capsules)
+        JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
         right.setOpaque(false);
-        JLabel livesLbl = new JLabel("CPU CORES: ");
-        livesLbl.setFont(new Font("Consolas", Font.BOLD, 11));
-        livesLbl.setForeground(RetroTheme.TEXT_DIM);
-        right.add(livesLbl);
+
+        JLabel liveScore = new JLabel("TARGET: 3 LANES");
+        liveScore.setFont(new Font("Consolas", Font.BOLD, 11));
+        liveScore.setForeground(RetroTheme.ACCENT_CYAN);
+        right.add(liveScore);
 
         bar.add(left, BorderLayout.WEST);
         bar.add(tabs, BorderLayout.CENTER);
         bar.add(right, BorderLayout.EAST);
         return bar;
+    }
+
+    private void updateAlgoButtons() {
+        for (JButton b : algoTabs) {
+            if (b != null) b.repaint();
+        }
     }
 
     private JPanel createBottomControlsBar() {
@@ -197,7 +239,7 @@ public class KernelTapperDialog extends JDialog {
             protected void paintComponent(Graphics g) {
                 super.paintComponent(g);
                 Graphics2D g2 = (Graphics2D) g.create();
-                g2.setColor(new Color(18, 12, 32));
+                g2.setColor(new Color(15, 10, 26));
                 g2.fillRect(0, 0, getWidth(), getHeight());
                 g2.setColor(new Color(60, 42, 88));
                 g2.drawLine(0, 0, getWidth(), 0);
@@ -205,21 +247,51 @@ public class KernelTapperDialog extends JDialog {
             }
         };
         bar.setOpaque(false);
-        bar.setBorder(BorderFactory.createEmptyBorder(8, 16, 8, 16));
+        bar.setBorder(BorderFactory.createEmptyBorder(6, 16, 6, 16));
 
-        JLabel help = new JLabel(
-                "[W]/[S] or [UP]/[DOWN] Switch Lane  |  [SPACEBAR] Dispatch Quantum Slice  |  [R] Restart  |  [ESC] Exit");
-        help.setFont(new Font("Consolas", Font.PLAIN, 10));
-        help.setForeground(RetroTheme.TEXT_DIM);
-        bar.add(help, BorderLayout.WEST);
+        // Keycap style help instructions
+        JPanel keycaps = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
+        keycaps.setOpaque(false);
 
-        JButton btnClose = RetroTheme.createRetroButton("RETURN TO OS [ESC]", RetroTheme.BTN_DARK,
-                RetroTheme.ACCENT_PINK);
+        keycaps.add(createKeyCap("[ W ] / [ S ] or CLICK"));
+        JLabel t1 = new JLabel("Switch Lane & Fire  ");
+        t1.setFont(new Font("Consolas", Font.BOLD, 11));
+        t1.setForeground(Color.WHITE);
+        keycaps.add(t1);
+
+        keycaps.add(createKeyCap("[ SPACEBAR ]"));
+        JLabel t2 = new JLabel("Dispatch CPU Slice  ");
+        t2.setFont(new Font("Consolas", Font.BOLD, 11));
+        t2.setForeground(Color.WHITE);
+        keycaps.add(t2);
+
+        keycaps.add(createKeyCap("[ R ]"));
+        JLabel t3 = new JLabel("Restart  ");
+        t3.setFont(new Font("Consolas", Font.BOLD, 11));
+        t3.setForeground(Color.WHITE);
+        keycaps.add(t3);
+
+        bar.add(keycaps, BorderLayout.WEST);
+
+        JButton btnClose = CPUSchedulingPanel.createArcadeButton("RETURN TO OS [ESC]", new Color(130, 25, 70), Color.WHITE, 28);
         btnClose.setFont(new Font("Consolas", Font.BOLD, 10));
         btnClose.addActionListener(e -> dispose());
         bar.add(btnClose, BorderLayout.EAST);
 
         return bar;
+    }
+
+    private JLabel createKeyCap(String text) {
+        JLabel l = new JLabel(text);
+        l.setFont(new Font("Consolas", Font.BOLD, 11));
+        l.setForeground(RetroTheme.ACCENT_CYAN);
+        l.setBackground(new Color(32, 22, 54));
+        l.setOpaque(true);
+        l.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(85, 60, 125), 1),
+                BorderFactory.createEmptyBorder(2, 6, 2, 6)
+        ));
+        return l;
     }
 
     private void setupKeyboardControls() {
@@ -231,8 +303,7 @@ public class KernelTapperDialog extends JDialog {
         am.put("UP", new AbstractAction() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                if (playerLane > 0)
-                    playerLane--;
+                if (playerLane > 0) playerLane--;
             }
         });
 
@@ -241,8 +312,7 @@ public class KernelTapperDialog extends JDialog {
         am.put("DOWN", new AbstractAction() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                if (playerLane < NUM_LANES - 1)
-                    playerLane++;
+                if (playerLane < NUM_LANES - 1) playerLane++;
             }
         });
 
@@ -271,17 +341,15 @@ public class KernelTapperDialog extends JDialog {
         });
     }
 
-    /**
-     * Initializes or restarts the game round based on the active scheduling
-     * algorithm.
-     */
     private void resetGameSession() {
         aliens.clear();
         bolts.clear();
         particles.clear();
+        clickPings.clear();
         playerLane = 0;
         lives = 3;
         score = 0;
+        faultCount = 0;
         simTime = 0.0;
         isGameOver = false;
         isVictory = false;
@@ -300,46 +368,40 @@ public class KernelTapperDialog extends JDialog {
             ar.at = sj.at;
             ar.lane = lane;
             // Spawn position staggered beyond runway end
-            ar.x = RUNWAY_END_X + (float) (sj.at * 50.0);
-            ar.y = LANE_Y_START + lane * LANE_HEIGHT + 18;
-            ar.speed = 0.55f;
-            ar.avatar = PixelSprites.getJobAvatar(i, 28);
+            ar.x = RUNWAY_END_X + (float) (sj.at * 55.0);
+            ar.y = LANE_Y_START + lane * LANE_HEIGHT + 32;
+            // Balanced Alien Speed: 0.38f (gives player comfortable reaction time to strategize!)
+            ar.speed = (float) Math.max(0.32, 0.44 - (sj.bt * 0.02));
+            ar.avatar = PixelSprites.getJobAvatar(i, 32);
             ar.active = true;
             aliens.add(ar);
         }
 
-        feedbackBanner = "MODE: " + currentMode.title + " // READY!";
+        feedbackBanner = "ACTIVE DIRECTIVE: " + currentMode.title + " // DEFEND CPU CORES!";
         bannerColor = RetroTheme.ACCENT_CYAN;
         bannerTimer = 180;
     }
 
-    /**
-     * Dispatches an Energy Quantum Slice down the player's active lane.
-     */
     private void dispatchQuantumEnergy() {
-        if (isGameOver || isVictory)
-            return;
+        if (isGameOver || isVictory) return;
 
         double quantum = (currentMode == AlgoMode.ROUND_ROBIN) ? 1.5 : 2.0;
         EnergyBolt bolt = new EnergyBolt();
         bolt.lane = playerLane;
-        bolt.x = COUNTER_X + 28;
-        bolt.y = LANE_Y_START + playerLane * LANE_HEIGHT + 28;
-        bolt.speed = 10.5f;
+        bolt.x = COUNTER_X + 24;
+        bolt.y = LANE_Y_START + playerLane * LANE_HEIGHT + 48;
+        bolt.speed = 12.0f;
         bolt.quantum = quantum;
         bolts.add(bolt);
 
-        // Small muzzle spark particles
-        for (int i = 0; i < 5; i++) {
-            particles.add(new Particle(bolt.x, bolt.y, (float) (Math.random() * 2 - 1), (float) (Math.random() * 2 - 1),
-                    RetroTheme.ACCENT_CYAN));
+        // Muzzle spark burst particles
+        for (int i = 0; i < 7; i++) {
+            particles.add(new Particle(bolt.x, bolt.y, (float) (Math.random() * 3 - 1), (float) (Math.random() * 3 - 1.5), RetroTheme.ACCENT_CYAN));
         }
     }
 
-    /**
-     * 60 FPS Game Loop: Physics, Collision, Scheduling Rules, Starvation
-     */
     private void updateGameLoop() {
+        animTick++;
         if (isGameOver || isVictory) {
             canvas.repaint();
             return;
@@ -360,8 +422,7 @@ public class KernelTapperDialog extends JDialog {
         // 2. Update Aliens & Check Bolt Collisions
         boolean allFinished = true;
         for (AlienRunner a : aliens) {
-            if (a.completed)
-                continue;
+            if (a.completed) continue;
             allFinished = false;
 
             // Move alien forward toward counter if arrived
@@ -370,17 +431,17 @@ public class KernelTapperDialog extends JDialog {
             }
 
             // Check Starvation: alien reached the CPU counter before completion!
-            if (a.x <= COUNTER_X + 20) {
+            if (a.x <= COUNTER_X + 26) {
                 lives--;
-                triggerExplosion(a.x, a.y, RetroTheme.ACCENT_PINK, 20);
-                feedbackBanner = "★ STARVATION HAZARD! " + a.pid + " REACHED CPU! -1 CORE";
+                triggerExplosion(a.x, a.y + 16, RetroTheme.ACCENT_PINK, 25);
+                feedbackBanner = "CRITICAL HAZARD! " + a.pid + " STARVED CPU! -1 CORE";
                 bannerColor = RetroTheme.ACCENT_PINK;
                 bannerTimer = 120;
                 a.x = RUNWAY_END_X - 100; // Knock back on starvation strike
 
                 if (lives <= 0) {
                     isGameOver = true;
-                    feedbackBanner = "GAME OVER: CPU CORES DEPLETED BY STARVATION!";
+                    feedbackBanner = "SYSTEM HALTED: ALL CPU CORES DEPLETED BY STARVATION!";
                     bannerColor = RetroTheme.ACCENT_PINK;
                 }
             }
@@ -388,39 +449,59 @@ public class KernelTapperDialog extends JDialog {
             // Collision with Energy Bolts on the SAME lane
             for (Iterator<EnergyBolt> boltIt = bolts.iterator(); boltIt.hasNext();) {
                 EnergyBolt b = boltIt.next();
-                if (b.lane == a.lane && Math.abs(b.x - a.x) < 22 && a.x <= RUNWAY_END_X) {
+                if (b.lane == a.lane && Math.abs(b.x - a.x) < 24 && a.x <= RUNWAY_END_X) {
                     boltIt.remove(); // Consume bolt
 
                     // Evaluate Scheduling Correctness according to Active Algorithm
                     boolean isCorrectAlgoChoice = checkSchedulingChoice(a);
+
                     if (!isCorrectAlgoChoice) {
-                        feedbackBanner = "ALGO MISMATCH! CHECK " + currentMode.code + " RULES!";
-                        bannerColor = RetroTheme.ACCENT_YELLOW;
-                        bannerTimer = 90;
-                        score = Math.max(0, score - 20);
-                    } else {
-                        score += 50;
+                        // POLICY FAULT: Shield deflects the laser! Maling alien ang binaril -> ZERO damage!
+                        triggerExplosion(a.x, a.y + 16, RetroTheme.ACCENT_PINK, 15);
+                        faultCount++;
+                        score = Math.max(0, score - 30);
+                        bannerColor = RetroTheme.ACCENT_PINK;
+                        bannerTimer = 100;
+
+                        AlienRunner expected = getExpectedTarget();
+                        String expectedPid = expected != null ? expected.pid : "earliest";
+                        if (faultCount >= 3) {
+                            faultCount = 0;
+                            lives--;
+                            triggerExplosion(COUNTER_X, a.y + 16, RetroTheme.ACCENT_PINK, 25);
+                            feedbackBanner = "3 POLICY FAULTS: CPU DAMAGED! Target was " + expectedPid + "! (-1 CORE)";
+                            if (lives <= 0) {
+                                isGameOver = true;
+                                feedbackBanner = "SYSTEM CRASH: CPU CORES DEPLETED BY POLICY FAULTS!";
+                            }
+                        } else {
+                            feedbackBanner = "[POLICY FAULT " + faultCount + "/3] Shot Deflected! " + a.pid + " is NOT next! Target " + expectedPid + " under " + currentMode.code + "!";
+                        }
+                        break; // Bolt consumed, alien takes zero damage!
                     }
+
+                    // Correct Target Hit!
+                    score += 50;
 
                     // Apply Quantum energy reduction
                     double cut = Math.min(a.remBt, b.quantum);
                     a.remBt -= cut;
-                    triggerExplosion(a.x, a.y, RetroTheme.ACCENT_YELLOW, 8);
+                    triggerExplosion(a.x, a.y + 16, RetroTheme.ACCENT_YELLOW, 10);
 
                     if (a.remBt <= 0.001) {
                         // Completed!
                         a.completed = true;
                         score += 150;
-                        AppState.addScore(15);
-                        triggerExplosion(a.x, a.y, RetroTheme.ACCENT_GREEN, 25);
-                        feedbackBanner = "✔ PROCESS " + a.pid + " TERMINATED! +150 PTS";
+                        AppState.addScore(25);
+                        triggerExplosion(a.x, a.y + 16, RetroTheme.ACCENT_GREEN, 30);
+                        feedbackBanner = "DIRECT HIT! " + a.pid + " TERMINATED! +150 PTS";
                         bannerColor = RetroTheme.ACCENT_GREEN;
                         bannerTimer = 90;
                     } else {
                         // Preemption / Round Robin push back!
                         if (currentMode == AlgoMode.ROUND_ROBIN) {
-                            a.x = Math.min(RUNWAY_END_X - 60, a.x + 130); // Pushed back to circular queue!
-                            feedbackBanner = "RR QUANTUM EXPIRED: " + a.pid + " PUSHED BACK IN QUEUE!";
+                            a.x = Math.min(RUNWAY_END_X - 60, a.x + 130);
+                            feedbackBanner = "RR VOLLEY FINISHED: " + a.pid + " ROTATED BACK IN QUEUE!";
                             bannerColor = RetroTheme.ACCENT_CYAN;
                             bannerTimer = 80;
                         } else if (currentMode == AlgoMode.SRT) {
@@ -435,7 +516,7 @@ public class KernelTapperDialog extends JDialog {
         // 3. Victory Condition
         if (allFinished && !aliens.isEmpty()) {
             isVictory = true;
-            feedbackBanner = "★ VICTORY! ALL JOBS DISPATCHED UNDER " + currentMode.code + "! ★";
+            feedbackBanner = "VICTORY! ALL JOBS DISPATCHED UNDER " + currentMode.code + "!";
             bannerColor = RetroTheme.ACCENT_GREEN;
             AppState.addScore(150);
         }
@@ -447,62 +528,90 @@ public class KernelTapperDialog extends JDialog {
             p.x += p.vx;
             p.y += p.vy;
             p.life--;
-            if (p.life <= 0)
-                pIt.remove();
+            if (p.life <= 0) pIt.remove();
         }
 
-        if (bannerTimer > 0)
-            bannerTimer--;
+        // 5. Update Click Pings
+        Iterator<ClickPing> cpIt = clickPings.iterator();
+        while (cpIt.hasNext()) {
+            ClickPing cp = cpIt.next();
+            cp.life--;
+            if (cp.life <= 0) cpIt.remove();
+        }
+
+        if (bannerTimer > 0) bannerTimer--;
 
         canvas.repaint();
     }
 
-    /**
-     * Checks if the alien being hit is the mathematically optimal choice under the
-     * active algorithm.
-     */
-    private boolean checkSchedulingChoice(AlienRunner target) {
+    private AlienRunner getExpectedTarget() {
         List<AlienRunner> readyQueue = new ArrayList<>();
         for (AlienRunner a : aliens) {
             if (!a.completed && a.x <= RUNWAY_END_X && simTime >= a.at) {
                 readyQueue.add(a);
             }
         }
-        if (readyQueue.isEmpty())
-            return true;
+        if (readyQueue.isEmpty()) return null;
 
         if (currentMode == AlgoMode.FCFS) {
-            // Must be the oldest arrival time
             readyQueue.sort(Comparator.comparingDouble(a -> a.at));
-            return readyQueue.get(0) == target;
         } else if (currentMode == AlgoMode.SJF) {
-            // Must have the smallest original burst time
             readyQueue.sort(Comparator.comparingDouble(a -> a.origBt));
-            return readyQueue.get(0) == target;
         } else if (currentMode == AlgoMode.SRT) {
-            // Must have the smallest remaining burst time
             readyQueue.sort(Comparator.comparingDouble(a -> a.remBt));
-            return readyQueue.get(0) == target;
         }
-        // Round Robin: Any active job can receive quantum time
-        return true;
+        return readyQueue.get(0);
+    }
+
+    private boolean checkSchedulingChoice(AlienRunner target) {
+        if (currentMode == AlgoMode.ROUND_ROBIN) return true;
+        AlienRunner exp = getExpectedTarget();
+        return exp == null || exp == target;
     }
 
     private void triggerExplosion(float x, float y, Color c, int count) {
         for (int i = 0; i < count; i++) {
-            float vx = (float) (Math.sin(i * 0.4) * (1.5 + Math.random() * 2.5));
-            float vy = (float) (Math.cos(i * 0.4) * (1.5 + Math.random() * 2.5));
+            float vx = (float) (Math.sin(i * 0.4) * (1.5 + Math.random() * 2.8));
+            float vy = (float) (Math.cos(i * 0.4) * (1.5 + Math.random() * 2.8));
             particles.add(new Particle(x, y, vx, vy, c));
         }
     }
 
     // =========================================================================
-    // ARCADE CANVAS RENDERER
+    // ARCADE CANVAS RENDERER (VIBRANT RETRO 16-BIT CABINET)
     // =========================================================================
     private class ArcadeCanvas extends JPanel {
         public ArcadeCanvas() {
             setBackground(new Color(10, 8, 20));
             setFocusable(true);
+
+            addMouseListener(new MouseAdapter() {
+                @Override
+                public void mousePressed(MouseEvent e) {
+                    if (isGameOver || isVictory) return;
+                    int my = e.getY();
+                    int lane = (my - LANE_Y_START) / LANE_HEIGHT;
+                    if (lane >= 0 && lane < NUM_LANES) {
+                        playerLane = lane;
+                        dispatchQuantumEnergy();
+                        clickPings.add(new ClickPing(e.getX(), e.getY()));
+                        repaint();
+                    }
+                }
+            });
+
+            addMouseMotionListener(new MouseMotionAdapter() {
+                @Override
+                public void mouseMoved(MouseEvent e) {
+                    int my = e.getY();
+                    int lane = (my - LANE_Y_START) / LANE_HEIGHT;
+                    if (lane >= 0 && lane < NUM_LANES && e.getX() >= COUNTER_X && e.getX() <= RUNWAY_END_X + 80) {
+                        setCursor(Cursor.getPredefinedCursor(Cursor.CROSSHAIR_CURSOR));
+                    } else {
+                        setCursor(Cursor.getDefaultCursor());
+                    }
+                }
+            });
         }
 
         @Override
@@ -514,143 +623,290 @@ public class KernelTapperDialog extends JDialog {
             int w = getWidth();
             int h = getHeight();
 
-            // 1. Retro CRT Grid & Background Glow
-            g2.setColor(new Color(15, 12, 28));
+            // 1. Deep Space CRT Grid Background
+            g2.setColor(new Color(14, 10, 26));
             g2.fillRect(0, 0, w, h);
 
-            g2.setColor(new Color(25, 20, 45));
-            for (int gx = 0; gx < w; gx += 40)
-                g2.drawLine(gx, 0, gx, h);
-            for (int gy = 0; gy < h; gy += 40)
-                g2.drawLine(0, gy, w, gy);
+            g2.setColor(new Color(24, 18, 42));
+            for (int gx = 0; gx < w; gx += 32) g2.drawLine(gx, 0, gx, h);
+            for (int gy = 0; gy < h; gy += 32) g2.drawLine(0, gy, w, gy);
 
-            // 2. Algorithm Rule Banner
-            g2.setColor(new Color(22, 16, 42));
-            g2.fillRoundRect(20, 10, w - 40, 46, 8, 8);
-            g2.setColor(new Color(60, 45, 90));
-            g2.drawRoundRect(20, 10, w - 40, 46, 8, 8);
+            // 2. Algorithm Policy Intel Strip (Glassmorphic Top Banner)
+            int bannerY = 10;
+            int bannerH = 54;
+            g2.setColor(new Color(22, 15, 44, 230));
+            g2.fillRoundRect(20, bannerY, w - 40, bannerH, 8, 8);
+            g2.setColor(new Color(75, 52, 115));
+            g2.drawRoundRect(20, bannerY, w - 40, bannerH, 8, 8);
+
+            // Left Neon Accent Bar
+            g2.setColor(RetroTheme.ACCENT_CYAN);
+            g2.fillRoundRect(22, bannerY + 4, 4, bannerH - 8, 2, 2);
 
             g2.setFont(new Font("Consolas", Font.BOLD, 12));
             g2.setColor(RetroTheme.ACCENT_CYAN);
-            g2.drawString("CURRENT POLICY: " + currentMode.title, 34, 30);
+            g2.drawString("POLICY DIRECTIVE // " + currentMode.title, 36, bannerY + 20);
 
-            g2.setFont(new Font("Consolas", Font.PLAIN, 10));
-            g2.setColor(RetroTheme.TEXT_WHITE);
-            g2.drawString("RULE: " + currentMode.rule, 34, 46);
-
-            // Score & Clock on top right
-            g2.setFont(new Font("Consolas", Font.BOLD, 12));
-            g2.setColor(RetroTheme.ACCENT_YELLOW);
-            g2.drawString(String.format("SCORE: %05d", score), w - 230, 30);
+            g2.setFont(new Font("Consolas", Font.BOLD, 11));
             g2.setColor(Color.WHITE);
-            g2.drawString(String.format("SIM TIME: %.1fs", simTime), w - 230, 46);
+            g2.drawString(currentMode.rule, 36, bannerY + 40);
 
-            // CPU Core Hearts
+            // Symmetrical HUD Cards on the Right: SCORE, TIME, CPU CORES
+            int rightBoxX = w - 310;
+            g2.setColor(new Color(15, 10, 28));
+            g2.fillRoundRect(rightBoxX, bannerY + 6, 280, 42, 6, 6);
+            g2.setColor(new Color(60, 42, 90));
+            g2.drawRoundRect(rightBoxX, bannerY + 6, 280, 42, 6, 6);
+
+            g2.setFont(new Font("Consolas", Font.BOLD, 11));
+            g2.setColor(RetroTheme.ACCENT_YELLOW);
+            g2.drawString(String.format("SCORE: %05d", score), rightBoxX + 12, bannerY + 22);
+
+            g2.setColor(Color.WHITE);
+            g2.drawString(String.format("TIME: %.1fs", simTime), rightBoxX + 12, bannerY + 38);
+
+            // 3 High-Tech Battery/Core Cells
+            int coreBaseX = rightBoxX + 160;
+            g2.setFont(new Font("Consolas", Font.BOLD, 10));
+            g2.setColor(RetroTheme.TEXT_DIM);
+            g2.drawString("CORES:", coreBaseX, bannerY + 20);
+
             for (int i = 0; i < 3; i++) {
-                int px = w - 100 + i * 24;
-                int py = 22;
-                if (i < lives) {
-                    g2.setColor(RetroTheme.ACCENT_PINK);
-                    g2.fillRoundRect(px, py, 18, 14, 4, 4);
+                int cx = coreBaseX + 44 + i * 22;
+                int cy = bannerY + 12;
+                boolean isAlive = (i < lives);
+
+                g2.setColor(new Color(25, 18, 42));
+                g2.fillRoundRect(cx, cy, 16, 20, 3, 3);
+                g2.setColor(isAlive ? RetroTheme.ACCENT_GREEN : new Color(60, 40, 75));
+                g2.drawRoundRect(cx, cy, 16, 20, 3, 3);
+
+                if (isAlive) {
+                    float pulse = (float)(Math.sin(animTick * 0.2 + i) * 0.3 + 0.7);
+                    g2.setColor(new Color(0, (int)(200 * pulse + 55), 100));
+                    g2.fillRoundRect(cx + 3, cy + 3, 10, 14, 2, 2);
                 } else {
-                    g2.setColor(new Color(50, 35, 65));
-                    g2.drawRoundRect(px, py, 18, 14, 4, 4);
+                    g2.setColor(new Color(120, 30, 60));
+                    g2.drawLine(cx + 3, cy + 3, cx + 13, cy + 17);
+                    g2.drawLine(cx + 13, cy + 3, cx + 3, cy + 17);
                 }
             }
 
-            // 3. Render 4 Runway Counters (Lanes)
+            // 3. Render 3 Spacious Futuristic Maglev Runways (Lanes)
+            int laneW = RUNWAY_END_X - COUNTER_X;
+            int laneH = 92;
+
+            // Vertical Mainframe Rail connecting the stations on the left
+            g2.setColor(new Color(32, 22, 58));
+            g2.fillRect(COUNTER_X - 54, LANE_Y_START + 6, 8, NUM_LANES * LANE_HEIGHT - 20);
+            g2.setColor(RetroTheme.ACCENT_CYAN);
+            g2.drawRect(COUNTER_X - 54, LANE_Y_START + 6, 8, NUM_LANES * LANE_HEIGHT - 20);
+
             for (int i = 0; i < NUM_LANES; i++) {
                 int ly = LANE_Y_START + i * LANE_HEIGHT;
+                boolean isPlayerActiveLane = (i == playerLane);
 
-                // Runway Counter Surface
-                g2.setColor(new Color(28, 20, 52));
-                g2.fillRect(COUNTER_X, ly + 40, RUNWAY_END_X - COUNTER_X, 16);
-                g2.setColor(new Color(75, 52, 115));
-                g2.drawRect(COUNTER_X, ly + 40, RUNWAY_END_X - COUNTER_X, 16);
+                // A. Runway Floor (Metallic gradient track)
+                GradientPaint trackGp = new GradientPaint(
+                        COUNTER_X, ly + 6, new Color(24, 18, 48),
+                        COUNTER_X, ly + 6 + laneH, new Color(14, 10, 26)
+                );
+                g2.setPaint(trackGp);
+                g2.fillRect(COUNTER_X, ly + 6, laneW, laneH);
 
-                // Neon track divider line
-                g2.setColor(new Color(45, 32, 75));
-                g2.drawLine(COUNTER_X, ly + 48, RUNWAY_END_X, ly + 48);
+                // Top & Bottom Glowing Rails
+                g2.setColor(isPlayerActiveLane ? RetroTheme.ACCENT_CYAN : new Color(65, 45, 95));
+                g2.setStroke(new BasicStroke(isPlayerActiveLane ? 2.0f : 1.0f));
+                g2.drawLine(COUNTER_X, ly + 6, RUNWAY_END_X, ly + 6);
+                g2.setColor(isPlayerActiveLane ? RetroTheme.ACCENT_PINK : new Color(50, 35, 75));
+                g2.drawLine(COUNTER_X, ly + 6 + laneH, RUNWAY_END_X, ly + 6 + laneH);
 
-                // Lane Label
+                // Animated Conveyor Chevrons moving left toward player
+                g2.setColor(new Color(55, 40, 85, isPlayerActiveLane ? 180 : 100));
+                g2.setStroke(new BasicStroke(1.5f));
+                int chevronOffset = (animTick * 2) % 40;
+                for (int cx = RUNWAY_END_X - chevronOffset; cx > COUNTER_X + 40; cx -= 40) {
+                    int cy = ly + 46;
+                    g2.drawLine(cx, cy - 8, cx - 8, cy);
+                    g2.drawLine(cx - 8, cy, cx, cy + 8);
+                }
+
+                // B. Station Terminal Pod on the left (Completely separated from Player)
+                int stationX = COUNTER_X - 115;
+                int stationY = ly + 12;
+                int stationW = 52;
+                int stationH = 68;
+                g2.setColor(isPlayerActiveLane ? new Color(45, 25, 75) : new Color(24, 16, 42));
+                g2.fillRoundRect(stationX, stationY, stationW, stationH, 8, 8);
+                g2.setColor(isPlayerActiveLane ? RetroTheme.ACCENT_CYAN : new Color(75, 52, 110));
+                g2.setStroke(new BasicStroke(isPlayerActiveLane ? 2.0f : 1.2f));
+                g2.drawRoundRect(stationX, stationY, stationW, stationH, 8, 8);
+
+                // Station Label
                 g2.setFont(new Font("Consolas", Font.BOLD, 10));
-                g2.setColor(new Color(110, 85, 160));
-                g2.drawString("QUEUE #" + (i + 1), COUNTER_X + 10, ly + 34);
+                g2.setColor(isPlayerActiveLane ? RetroTheme.ACCENT_YELLOW : new Color(170, 150, 210));
+                g2.drawString("LANE #" + (i + 1), stationX + 6, stationY + 24);
 
-                // CPU Dispatch Pad on the left
-                g2.setColor(new Color(40, 26, 70));
-                g2.fillRoundRect(COUNTER_X - 50, ly + 14, 44, 44, 8, 8);
-                g2.setColor(new Color(85, 58, 130));
-                g2.drawRoundRect(COUNTER_X - 50, ly + 14, 44, 44, 8, 8);
+                // LED status light
+                g2.setColor(isPlayerActiveLane ? RetroTheme.ACCENT_GREEN : new Color(80, 60, 110));
+                g2.fillOval(stationX + 22, stationY + 44, 8, 8);
 
-                // Starvation Hazard Zone line
-                g2.setColor(new Color(255, 65, 105, 90));
-                g2.drawLine(COUNTER_X + 24, ly + 10, COUNTER_X + 24, ly + 65);
+                // C. Starvation Tripwire Hazard Warning Zone
+                int hazX = COUNTER_X + 28;
+                g2.setColor(new Color(255, 40, 80, 140));
+                g2.setStroke(new BasicStroke(2.0f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 10, new float[]{4, 4}, 0));
+                g2.drawLine(hazX, ly + 6, hazX, ly + 6 + laneH);
+                g2.setStroke(new BasicStroke(1.0f));
+
+                // D. Memory Spawn Portal Pylon on the right
+                g2.setColor(new Color(40, 25, 75));
+                g2.fillRoundRect(RUNWAY_END_X - 4, ly + 8, 14, laneH - 4, 4, 4);
+                g2.setColor(RetroTheme.ACCENT_CYAN);
+                g2.drawRoundRect(RUNWAY_END_X - 4, ly + 8, 14, laneH - 4, 4, 4);
             }
 
-            // 4. Render Player (CPU Dispatcher) at active lane
-            int py = LANE_Y_START + playerLane * LANE_HEIGHT + 14;
+            // 4. Render Player Dispatcher & Targeting Sights at Active Lane
+            int activeLy = LANE_Y_START + playerLane * LANE_HEIGHT;
+            int py = activeLy + 26;
             int px = COUNTER_X - 46;
+
+            // Targeting Laser Sight extending from dispatcher down the runway
+            g2.setColor(new Color(0, 240, 255, 65));
+            g2.setStroke(new BasicStroke(1.2f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 10, new float[]{6, 6}, animTick % 12));
+            g2.drawLine(COUNTER_X, activeLy + 46, RUNWAY_END_X, activeLy + 46);
+            g2.setStroke(new BasicStroke(1.0f));
+
+            // Plasma glow around dispatcher
+            float pulse = (float)(Math.sin(animTick * 0.3) * 0.5 + 0.5);
+            g2.setColor(new Color(255, 42, 141, (int)(40 + pulse * 70)));
+            g2.fillRoundRect(px - 4, py - 4, 44, 44, 10, 10);
+
             if (playerSprite != null) {
                 g2.drawImage(playerSprite, px, py, null);
             }
-            // Active Core Glow
             g2.setColor(RetroTheme.ACCENT_CYAN);
-            g2.drawRoundRect(px - 2, py - 2, 40, 40, 6, 6);
+            g2.setStroke(new BasicStroke(2.0f));
+            g2.drawRoundRect(px - 2, py - 2, 40, 40, 8, 8);
 
-            // 5. Render Energy Bolts
+            // 5. Render Energy Bolts (Glowing Plasma Projectiles)
             for (EnergyBolt b : bolts) {
+                int bx = (int) b.x;
+                int by = (int) b.y;
+                // Outer Cyan Aura
+                g2.setColor(new Color(0, 240, 255, 120));
+                g2.fillRoundRect(bx - 4, by - 3, 28, 14, 6, 6);
+                // Cyan Core
                 g2.setColor(RetroTheme.ACCENT_CYAN);
-                g2.fillRoundRect((int) b.x, (int) b.y, 20, 8, 4, 4);
+                g2.fillRoundRect(bx, by, 20, 8, 4, 4);
+                // White Laser Core
                 g2.setColor(Color.WHITE);
-                g2.fillRoundRect((int) b.x + 4, (int) b.y + 2, 12, 4, 2, 2);
+                g2.fillRoundRect(bx + 4, by + 2, 12, 4, 2, 2);
             }
 
-            // 6. Render Aliens (Processes)
+            // 6. Find mathematically expected target under active policy to show reticle
+            AlienRunner currentTarget = getExpectedTarget();
+
+            // 7. Render Aliens (Creeps) on the Runway
             for (AlienRunner a : aliens) {
-                if (a.completed)
-                    continue;
+                if (a.completed || a.x > RUNWAY_END_X) continue;
 
                 int ax = (int) a.x;
                 int ay = (int) a.y;
+                float aBob = (float)(Math.sin(animTick * 0.2 + a.lane) * 2.5);
 
                 if (a.avatar != null) {
-                    g2.drawImage(a.avatar, ax, ay, null);
+                    g2.drawImage(a.avatar, ax, (int)(ay + aBob), null);
                 }
 
-                // Process Badge: [PID | BT: X.X]
-                g2.setColor(new Color(20, 15, 36, 210));
-                g2.fillRoundRect(ax - 12, ay - 20, 56, 16, 4, 4);
-                g2.setColor(RetroTheme.ACCENT_YELLOW);
-                g2.drawRoundRect(ax - 12, ay - 20, 56, 16, 4, 4);
+                // If this is the mathematically expected target, draw glowing lock reticle!
+                if (a == currentTarget) {
+                    float lockPulse = (float)(Math.sin(animTick * 0.4) * 0.5 + 0.5);
+                    g2.setColor(new Color(255, (int)(180 + lockPulse * 75), 0));
+                    g2.setStroke(new BasicStroke(2.0f));
+                    int rx = ax - 6;
+                    int ry = (int)(ay + aBob - 6);
+                    int rSize = 44;
+                    // Corner brackets
+                    int cLen = 7;
+                    g2.drawLine(rx, ry, rx + cLen, ry);
+                    g2.drawLine(rx, ry, rx, ry + cLen);
+                    g2.drawLine(rx + rSize, ry, rx + rSize - cLen, ry);
+                    g2.drawLine(rx + rSize, ry, rx + rSize, ry + cLen);
+                    g2.drawLine(rx, ry + rSize, rx + cLen, ry + rSize);
+                    g2.drawLine(rx, ry + rSize, rx, ry + rSize - cLen);
+                    g2.drawLine(rx + rSize, ry + rSize, rx + rSize - cLen, ry + rSize);
+                    g2.drawLine(rx + rSize, ry + rSize, rx + rSize, ry + rSize - cLen);
 
-                g2.setFont(new Font("Consolas", Font.BOLD, 9));
+                    g2.setFont(new Font("Consolas", Font.BOLD, 9));
+                    g2.drawString("LOCK", rx + 10, ry - 3);
+                }
+
+                // Creep Health Bar above sprite
+                int hpBarW = 44;
+                int hpBarH = 4;
+                int hpBarX = ax - 6;
+                int hpBarY = (int)(ay + aBob - 18);
+
+                g2.setColor(new Color(15, 10, 24));
+                g2.fillRoundRect(hpBarX, hpBarY, hpBarW, hpBarH, 2, 2);
+
+                float hpFrac = (float) Math.min(1.0, Math.max(0.1, a.remBt / 5.0));
+                Color hpCol = a.remBt > 3.0 ? RetroTheme.ACCENT_PINK : (a.remBt > 1.5 ? RetroTheme.ACCENT_YELLOW : RetroTheme.ACCENT_GREEN);
+                g2.setColor(hpCol);
+                g2.fillRoundRect(hpBarX, hpBarY, (int)(hpBarW * hpFrac), hpBarH, 2, 2);
+
+                // Process Badge: [PID | HP: X.X]
+                g2.setColor(new Color(18, 12, 32, 230));
+                g2.fillRoundRect(ax - 8, (int)(ay + aBob + 34), 48, 16, 4, 4);
+                g2.setColor(a == currentTarget ? RetroTheme.ACCENT_YELLOW : new Color(75, 52, 110));
+                g2.setStroke(new BasicStroke(1.0f));
+                g2.drawRoundRect(ax - 8, (int)(ay + aBob + 34), 48, 16, 4, 4);
+
+                g2.setFont(new Font("Consolas", Font.BOLD, 10));
                 g2.setColor(Color.WHITE);
-                g2.drawString(a.pid, ax - 8, ay - 8);
+                g2.drawString(a.pid, ax - 4, (int)(ay + aBob + 46));
 
-                // Burst Time meter
-                g2.setColor((currentMode == AlgoMode.SRT) ? RetroTheme.ACCENT_PINK : RetroTheme.ACCENT_CYAN);
-                g2.drawString(String.format("%.1fs", a.remBt), ax + 12, ay - 8);
+                g2.setColor(RetroTheme.ACCENT_YELLOW);
+                g2.drawString(String.format("%.1f", a.remBt), ax + 18, (int)(ay + aBob + 46));
             }
 
-            // 7. Render Particles
+            // 8. Render Particles
             for (Particle pt : particles) {
                 g2.setColor(pt.color);
                 g2.fillRect((int) pt.x, (int) pt.y, 3, 3);
             }
 
-            // 8. Flight Feedback Banner (Bottom area)
-            g2.setColor(new Color(20, 15, 35, 230));
-            g2.fillRoundRect(w / 2 - 250, h - 85, 500, 30, 8, 8);
+            // 8b. Render Tactical Click Reticles
+            for (ClickPing cp : clickPings) {
+                float frac = (10 - cp.life) / 10.0f;
+                int r = (int)(frac * 24) + 6;
+                int alpha = Math.max(0, Math.min(255, (int)(cp.life * 25)));
+                g2.setColor(new Color(0, 240, 255, alpha));
+                g2.setStroke(new BasicStroke(1.8f));
+                g2.drawOval(cp.x - r, cp.y - r, r * 2, r * 2);
+                g2.drawLine(cp.x - r - 5, cp.y, cp.x + r + 5, cp.y);
+                g2.drawLine(cp.x, cp.y - r - 5, cp.x, cp.y + r + 5);
+            }
+
+            // 9. Flight Feedback Ticker (Bottom Area)
+            int tickerW = 620;
+            int tickerH = 32;
+            int tickerX = (w - tickerW) / 2;
+            int tickerY = h - 68;
+
+            g2.setColor(new Color(20, 14, 38, 235));
+            g2.fillRoundRect(tickerX, tickerY, tickerW, tickerH, 6, 6);
             g2.setColor(bannerColor);
-            g2.drawRoundRect(w / 2 - 250, h - 85, 500, 30, 8, 8);
+            g2.setStroke(new BasicStroke(1.2f));
+            g2.drawRoundRect(tickerX, tickerY, tickerW, tickerH, 6, 6);
 
             g2.setFont(new Font("Consolas", Font.BOLD, 11));
             FontMetrics fm = g2.getFontMetrics();
-            int btx = w / 2 - fm.stringWidth(feedbackBanner) / 2;
-            g2.drawString(feedbackBanner, btx, h - 66);
+            int btx = (w - fm.stringWidth(feedbackBanner)) / 2;
+            g2.setColor(Color.WHITE);
+            g2.drawString(feedbackBanner, btx, tickerY + 20);
 
-            // 9. Overlay Screens (Victory / Game Over)
+            // 10. Overlay Screens (Victory / Game Over)
             if (isVictory) {
                 renderOverlayCard(g2, w, h, "★ FLIGHT CLEARED: S-RANK DISPATCH ★",
                         "All alien processes cleared under " + currentMode.code + " rules!",
@@ -667,24 +923,26 @@ public class KernelTapperDialog extends JDialog {
         }
 
         private void renderOverlayCard(Graphics2D g2, int w, int h, String title, String sub, String act, Color col) {
-            g2.setColor(new Color(10, 8, 20, 220));
+            g2.setColor(new Color(10, 8, 20, 225));
             g2.fillRect(0, 0, w, h);
 
-            int cw = 560;
-            int ch = 180;
+            int cw = 580;
+            int ch = 190;
             int cx = (w - cw) / 2;
             int cy = (h - ch) / 2;
 
             g2.setColor(new Color(25, 18, 45));
             g2.fillRoundRect(cx, cy, cw, ch, 12, 12);
             g2.setColor(col);
+            g2.setStroke(new BasicStroke(2.0f));
             g2.drawRoundRect(cx, cy, cw, ch, 12, 12);
 
-            g2.setFont(new Font("Consolas", Font.BOLD, 16));
+            g2.setFont(new Font("Consolas", Font.BOLD, 17));
+            g2.setColor(col);
             FontMetrics fm = g2.getFontMetrics();
             g2.drawString(title, cx + (cw - fm.stringWidth(title)) / 2, cy + 45);
 
-            g2.setFont(new Font("Consolas", Font.PLAIN, 12));
+            g2.setFont(new Font("Consolas", Font.BOLD, 12));
             g2.setColor(Color.WHITE);
             fm = g2.getFontMetrics();
             g2.drawString(sub, cx + (cw - fm.stringWidth(sub)) / 2, cy + 85);
@@ -694,11 +952,11 @@ public class KernelTapperDialog extends JDialog {
             fm = g2.getFontMetrics();
             g2.drawString(act, cx + (cw - fm.stringWidth(act)) / 2, cy + 125);
 
-            g2.setFont(new Font("Consolas", Font.ITALIC, 10));
+            g2.setFont(new Font("Consolas", Font.BOLD, 11));
             g2.setColor(RetroTheme.TEXT_DIM);
-            String hint = "[R] Play Again  |  [1]-[4] Try Another Algorithm  |  [ESC] Close";
+            String hint = "[R] Play Again  |  [ESC] Return to OS";
             fm = g2.getFontMetrics();
-            g2.drawString(hint, cx + (cw - fm.stringWidth(hint)) / 2, cy + 155);
+            g2.drawString(hint, cx + (cw - fm.stringWidth(hint)) / 2, cy + 160);
         }
     }
 
@@ -738,6 +996,15 @@ public class KernelTapperDialog extends JDialog {
             this.color = c;
             this.maxLife = 20 + (int) (Math.random() * 15);
             this.life = maxLife;
+        }
+    }
+
+    private static class ClickPing {
+        int x, y;
+        int life = 10;
+        ClickPing(int x, int y) {
+            this.x = x;
+            this.y = y;
         }
     }
 }

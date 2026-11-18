@@ -1,6 +1,7 @@
 package arcadeos;
 
 import java.awt.*;
+import java.awt.event.*;
 import javax.swing.*;
 import javax.swing.border.*;
 
@@ -24,6 +25,9 @@ public class RetroTheme {
     public static final Color INPUT_BG      = new Color(14, 10, 30);
     public static final Color ROW_EVEN      = new Color(18, 13, 36);
     public static final Color ROW_ODD       = new Color(22, 16, 44);
+    // Red tint used to flag conflicting table rows (e.g. overlapping segments).
+    public static final Color OVERLAP_BG    = new Color(74, 16, 28);
+    public static final Color OVERLAP_FG    = new Color(255, 138, 158);
 
     // ── Fonts ─────────────────────────────────────────────────────────────────
     public static final Font FONT_XL    = new Font("Consolas", Font.BOLD, 22);
@@ -38,33 +42,203 @@ public class RetroTheme {
     public static final Font RETRO_FONT_BOLD = FONT_SM;
 
     // ── Button Factory ───────────────────────────────────────────────────────
+    public static class ArcadeButton extends JButton {
+        private Color baseBg;
+        private Color baseFg;
+        private boolean isHovered = false;
+        private boolean isPressed = false;
+
+        public ArcadeButton(String text, Color bg, Color fg) {
+            super(text);
+            this.baseBg = (bg != null) ? bg : BTN_DARK;
+            this.baseFg = (fg != null) ? fg : TEXT_WHITE;
+            setFont(new Font("Consolas", Font.BOLD, 11));
+            setForeground(this.baseFg);
+            setBackground(this.baseBg);
+            setFocusPainted(false);
+            setContentAreaFilled(false);
+            setOpaque(false);
+            setBorderPainted(false);
+            setBorder(BorderFactory.createEmptyBorder(5, 12, 5, 12));
+            setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+
+            addMouseListener(new MouseAdapter() {
+                @Override
+                public void mouseEntered(MouseEvent e) {
+                    isHovered = true;
+                    repaint();
+                }
+                @Override
+                public void mouseExited(MouseEvent e) {
+                    isHovered = false;
+                    isPressed = false;
+                    repaint();
+                }
+                @Override
+                public void mousePressed(MouseEvent e) {
+                    if (isEnabled()) {
+                        isPressed = true;
+                        repaint();
+                    }
+                }
+                @Override
+                public void mouseReleased(MouseEvent e) {
+                    isPressed = false;
+                    repaint();
+                }
+            });
+        }
+
+        @Override
+        public void setBackground(Color bg) {
+            super.setBackground(bg);
+            this.baseBg = bg;
+            repaint();
+        }
+
+        @Override
+        public void setForeground(Color fg) {
+            super.setForeground(fg);
+            this.baseFg = fg;
+            repaint();
+        }
+
+        @Override
+        public Dimension getPreferredSize() {
+            Dimension d = super.getPreferredSize();
+            return new Dimension(Math.max(d.width + 4, 32), Math.max(d.height + 2, 26));
+        }
+
+        @Override
+        protected void paintComponent(Graphics g) {
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_LCD_HRGB);
+
+            int w = getWidth();
+            int h = getHeight();
+            int arc = 8;
+            int yOffset = isPressed ? 2 : 0;
+            int plateH = h - 3;
+
+            Color bg = (baseBg != null) ? baseBg : BTN_DARK;
+            Color fg = (baseFg != null) ? baseFg : TEXT_WHITE;
+
+            double lum = (0.299 * bg.getRed() + 0.587 * bg.getGreen() + 0.114 * bg.getBlue()) / 255.0;
+            boolean isLightBg = lum >= 0.45;
+
+            // 1. Ambient Glow Halo on Hover
+            if (isHovered && isEnabled()) {
+                Color glowC = isLightBg ? bg : fg;
+                g2.setColor(new Color(glowC.getRed(), glowC.getGreen(), glowC.getBlue(), 55));
+                g2.fillRoundRect(0, 0, w, h, arc + 4, arc + 4);
+            }
+
+            // 2. 3D Bottom Bevel / Drop Shadow Lip
+            int shadowY = yOffset + plateH;
+            if (shadowY <= h) {
+                Color shadowC = new Color(
+                        Math.max(0, (int)(bg.getRed() * 0.40)),
+                        Math.max(0, (int)(bg.getGreen() * 0.40)),
+                        Math.max(0, (int)(bg.getBlue() * 0.40)),
+                        240
+                );
+                g2.setColor(shadowC);
+                g2.fillRoundRect(1, yOffset + 2, w - 2, h - yOffset - 2, arc, arc);
+            }
+
+            // 3. Saturated Arcade Gradient Plate
+            Color topC, botC;
+            if (isHovered && isEnabled()) {
+                topC = new Color(
+                        Math.min(255, (int)(bg.getRed() * 1.25 + 18)),
+                        Math.min(255, (int)(bg.getGreen() * 1.25 + 18)),
+                        Math.min(255, (int)(bg.getBlue() * 1.25 + 18))
+                );
+                botC = new Color(
+                        Math.min(255, (int)(bg.getRed() * 0.95)),
+                        Math.min(255, (int)(bg.getGreen() * 0.95)),
+                        Math.min(255, (int)(bg.getBlue() * 0.95))
+                );
+            } else {
+                topC = new Color(
+                        Math.min(255, (int)(bg.getRed() * 1.10)),
+                        Math.min(255, (int)(bg.getGreen() * 1.10)),
+                        Math.min(255, (int)(bg.getBlue() * 1.10))
+                );
+                botC = new Color(
+                        Math.max(0, (int)(bg.getRed() * 0.70)),
+                        Math.max(0, (int)(bg.getGreen() * 0.70)),
+                        Math.max(0, (int)(bg.getBlue() * 0.70))
+                );
+            }
+
+            GradientPaint gp = new GradientPaint(0, yOffset, topC, 0, yOffset + plateH, botC);
+            g2.setPaint(gp);
+            g2.fillRoundRect(1, yOffset, w - 2, plateH, arc, arc);
+
+            // 4. Top Glass / Gloss Reflection Highlight (Top 40%)
+            int glossH = Math.max(3, plateH / 2 - 1);
+            GradientPaint glossGp = new GradientPaint(
+                    0, yOffset + 1, new Color(255, 255, 255, isLightBg ? 65 : 40),
+                    0, yOffset + glossH, new Color(255, 255, 255, 4)
+            );
+            g2.setPaint(glossGp);
+            g2.fillRoundRect(2, yOffset + 1, w - 4, glossH, arc - 2, arc - 2);
+
+            // 5. Tactile 3D Border & Neon Edge
+            if (isLightBg) {
+                g2.setColor(isHovered ? Color.WHITE : new Color(15, 10, 25, 220));
+                g2.setStroke(new BasicStroke(isHovered ? 1.8f : 1.2f));
+            } else {
+                Color borderC = isHovered ? fg : new Color(fg.getRed(), fg.getGreen(), fg.getBlue(), 160);
+                g2.setColor(borderC);
+                g2.setStroke(new BasicStroke(isHovered ? 1.8f : 1.2f));
+            }
+            g2.drawRoundRect(1, yOffset, w - 3, plateH - 1, arc, arc);
+
+            // 6. Icon and Text Rendering with 3D Emboss
+            Icon icon = getIcon();
+            String text = getText();
+            Font font = getFont();
+            g2.setFont(font);
+            FontMetrics fm = g2.getFontMetrics();
+
+            int iconW = (icon != null) ? icon.getIconWidth() : 0;
+            int gap = (icon != null && text != null && !text.isEmpty()) ? getIconTextGap() : 0;
+            int textW = (text != null && !text.isEmpty()) ? fm.stringWidth(text) : 0;
+            int totalContentW = iconW + gap + textW;
+
+            int startX = (w - totalContentW) / 2;
+
+            // Draw Icon
+            if (icon != null) {
+                int iconY = yOffset + (plateH - icon.getIconHeight()) / 2;
+                icon.paintIcon(this, g2, startX, iconY);
+            }
+
+            // Draw Crisp Text (Clean, high-contrast, razor-sharp 8-bit text without muddy offset shadows)
+            if (text != null && !text.isEmpty()) {
+                int textX = startX + iconW + gap;
+                int textY = yOffset + (plateH + fm.getAscent() - fm.getDescent()) / 2;
+
+                g2.setColor(isLightBg ? new Color(15, 10, 25) : (isHovered ? Color.WHITE : fg));
+                g2.drawString(text, textX, textY);
+            }
+
+            g2.dispose();
+        }
+    }
+
     public static JButton createRetroButton(String text, Color bg, Color fg) {
-        JButton btn = new JButton(text);
-        btn.setFont(FONT_SM);
-        btn.setBackground(bg);
-        btn.setForeground(fg);
-        btn.setFocusPainted(false);
-        btn.setOpaque(true);
-        btn.setBorderPainted(true);
-        btn.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(fg, 1),
-                BorderFactory.createEmptyBorder(4, 10, 4, 10)
-        ));
-        btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        return btn;
+        return new ArcadeButton(text, bg, fg);
     }
 
     /** Large primary action button (e.g., SIGN IN, START MISSION) */
     public static JButton createPrimaryButton(String text) {
-        JButton btn = new JButton(text);
+        ArcadeButton btn = new ArcadeButton(text, ACCENT_PINK, Color.WHITE);
         btn.setFont(FONT_MD);
-        btn.setBackground(ACCENT_PINK);
-        btn.setForeground(Color.WHITE);
-        btn.setFocusPainted(false);
-        btn.setOpaque(true);
-        btn.setBorderPainted(false);
         btn.setBorder(BorderFactory.createEmptyBorder(8, 20, 8, 20));
-        btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         return btn;
     }
 
@@ -85,9 +259,29 @@ public class RetroTheme {
         return btn;
     }
 
-    /** Nav-bar small tab-style button */
+    /** Nav-bar small tab-style button with Text/Emoji */
     public static JButton createNavButton(String icon, String label, Color fg) {
-        JButton btn = new JButton(icon + " " + label);
+        JButton btn = new JButton(icon.isEmpty() ? label : (icon + " " + label));
+        btn.setFont(FONT_XS);
+        btn.setBackground(BTN_DARK);
+        btn.setForeground(fg);
+        btn.setFocusPainted(false);
+        btn.setOpaque(true);
+        btn.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(BORDER_COLOR, 1),
+                BorderFactory.createEmptyBorder(3, 8, 3, 8)
+        ));
+        btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        return btn;
+    }
+
+    /** Nav-bar small button with Pixel Icon sprite (guaranteed no broken glyphs!) */
+    public static JButton createNavButton(Icon icon, String label, Color fg) {
+        JButton btn = new JButton(label);
+        if (icon != null) {
+            btn.setIcon(icon);
+            btn.setIconTextGap(4);
+        }
         btn.setFont(FONT_XS);
         btn.setBackground(BTN_DARK);
         btn.setForeground(fg);
@@ -130,12 +324,27 @@ public class RetroTheme {
 
     // ── Table Factory ─────────────────────────────────────────────────────────
     public static JTable createRetroTable(javax.swing.table.DefaultTableModel model) {
+        return createRetroTable(model, null);
+    }
+
+    /**
+     * Table variant that tints "flagged" rows red (e.g. segments whose
+     * [base, base+limit) range overlaps another segment). Pass {@code null}
+     * for {@code flaggedRow} to get the standard look.
+     */
+    public static JTable createRetroTable(javax.swing.table.DefaultTableModel model,
+                                          java.util.function.IntPredicate flaggedRow) {
         JTable table = new JTable(model) {
             @Override public Component prepareRenderer(javax.swing.table.TableCellRenderer r, int row, int col) {
                 Component c = super.prepareRenderer(r, row, col);
                 if (!isRowSelected(row)) {
-                    c.setBackground(row % 2 == 0 ? ROW_EVEN : ROW_ODD);
-                    c.setForeground(TEXT_WHITE);
+                    if (flaggedRow != null && flaggedRow.test(row)) {
+                        c.setBackground(OVERLAP_BG);
+                        c.setForeground(OVERLAP_FG);
+                    } else {
+                        c.setBackground(row % 2 == 0 ? ROW_EVEN : ROW_ODD);
+                        c.setForeground(TEXT_WHITE);
+                    }
                 } else {
                     c.setBackground(new Color(80, 30, 100));
                     c.setForeground(ACCENT_CYAN);
@@ -229,5 +438,19 @@ public class RetroTheme {
         UIManager.put("ToolTip.foreground",            ACCENT_CYAN);
         UIManager.put("ToolTip.font",                  FONT_XS);
         UIManager.put("Table.alternateRowColor",       ROW_ODD);
+    }
+
+    /**
+     * Calculates a dialog size that never exceeds the usable desktop bounds
+     * (accounting for multi-monitors, taskbars, and display scaling).
+     */
+    public static Dimension getClampedDialogSize(Component parent, int targetW, int targetH) {
+        GraphicsConfiguration gc = (parent != null) ? parent.getGraphicsConfiguration()
+                : GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice().getDefaultConfiguration();
+        Rectangle b = (gc != null) ? gc.getBounds() : new Rectangle(0, 0, 1024, 768);
+        Insets insets = (gc != null) ? Toolkit.getDefaultToolkit().getScreenInsets(gc) : new Insets(0, 0, 0, 0);
+        int maxW = Math.max(400, b.width - insets.left - insets.right - 20);
+        int maxH = Math.max(300, b.height - insets.top - insets.bottom - 20);
+        return new Dimension(Math.min(targetW, maxW), Math.min(targetH, maxH));
     }
 }

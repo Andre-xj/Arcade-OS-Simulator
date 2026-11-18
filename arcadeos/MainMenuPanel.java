@@ -25,22 +25,61 @@ public class MainMenuPanel extends JPanel {
     private boolean pulseUp = false;
     private Image bgImage;
 
+    // Background Interactive Dot Particles ("bilog bilog or dots nasa bg")
+    private static class BgDotParticle {
+        float x, y;
+        float vx, vy;
+        float baseRadius;
+        float currentRadius;
+        float alpha;
+        float pulsePhase;
+        Color color;
+
+        public BgDotParticle(float x, float y, float vx, float vy, float r, float a, float phase, Color c) {
+            this.x = x;
+            this.y = y;
+            this.vx = vx;
+            this.vy = vy;
+            this.baseRadius = r;
+            this.currentRadius = r;
+            this.alpha = a;
+            this.pulsePhase = phase;
+            this.color = c;
+        }
+    }
+
+    private final java.util.List<BgDotParticle> bgDots = new java.util.ArrayList<>();
+    private float mouseX = -999;
+    private float mouseY = -999;
+    private float smoothMouseX = -999;
+    private float smoothMouseY = -999;
+    private Timer bgParticleTimer;
+
+    private static final Color[] DOT_COLORS = {
+        new Color(40, 240, 255),   // Electric Cyan
+        new Color(255, 42, 109),   // Neon Pink
+        new Color(255, 205, 50),   // Amber Gold
+        new Color(175, 120, 255),  // Cyber Violet
+        new Color(50, 255, 190),   // Mint Green
+        new Color(245, 240, 255)   // Soft Starlight White
+    };
+
     // Scrolling ticker offset
     private float tickerOffset = 0;
     private Timer tickerTimer;
 
     private final String[] menuTitles = {
-        "SYSTEM ARCHIVES",
-        "QUIZ MODE",
-        "ABOUT SYSTEM",
-        "EXIT"
+        "01  SYSTEM ARCHIVES",
+        "02  QUIZ ARENA",
+        "03  SYSTEM INTEL & SPECS",
+        "04  EXIT SESSION"
     };
 
     private final String[] menuSubtitles = {
-        "8 CORE SIMULATOR MANUALS // CPU, MEMORY, DISK",
-        "CHALLENGE TASKS & KERNEL QUESTIONS",
-        "DEVELOPER CREDITS & SYSTEM ARCHITECTURE",
-        "TERMINATE CURRENT KERNEL SESSION"
+        "8 CORE SIMULATOR LABS // CPU, MEMORY, DISK & CONCURRENCY",
+        "KERNEL MASTERY CHALLENGES & ACADEMIC DRILLS",
+        "SYSTEM ARCHITECTURE, TECH STACK & CREDITS",
+        "TERMINATE SIMULATOR & RETURN TO DESKTOP"
     };
 
     private JPanel menuListPanel;
@@ -50,17 +89,16 @@ public class MainMenuPanel extends JPanel {
         setBackground(RetroTheme.BG_DARK);
         setLayout(new BorderLayout());
 
-        // Load background image
+        // Load background image (Use bg.jpg with retro pixelation filter)
         try {
             File f = new File("image/bg.jpg");
-            if (!f.exists()) {
-                f = new File(System.getProperty("user.dir"), "image/bg.jpg");
-            }
+            if (!f.exists()) f = new File(System.getProperty("user.dir"), "image/bg.jpg");
             if (f.exists()) {
-                bgImage = ImageIO.read(f);
+                java.awt.image.BufferedImage raw = ImageIO.read(f);
+                bgImage = applyPixelFilter(raw, 2);
             }
         } catch (Exception e) {
-            System.err.println("Could not load image/bg.jpg: " + e.getMessage());
+            System.err.println("Could not load background image: " + e.getMessage());
         }
 
         // Keyboard navigation
@@ -70,13 +108,16 @@ public class MainMenuPanel extends JPanel {
             public void keyPressed(KeyEvent e) {
                 if (e.getKeyCode() == KeyEvent.VK_UP || e.getKeyCode() == KeyEvent.VK_W) {
                     selectedMenuIndex = (selectedMenuIndex - 1 + menuTitles.length) % menuTitles.length;
+                    ArchivesPanel.playTone(920, 25, 0.35f);
                     updateMenuStyles();
                     repaint();
                 } else if (e.getKeyCode() == KeyEvent.VK_DOWN || e.getKeyCode() == KeyEvent.VK_S) {
                     selectedMenuIndex = (selectedMenuIndex + 1) % menuTitles.length;
+                    ArchivesPanel.playTone(920, 25, 0.35f);
                     updateMenuStyles();
                     repaint();
                 } else if (e.getKeyCode() == KeyEvent.VK_ENTER) {
+                    ArchivesPanel.playTone(1200, 75, 0.5f);
                     triggerMenuAction(selectedMenuIndex);
                 } else if (e.getKeyCode() == KeyEvent.VK_ESCAPE) {
                     confirmExit();
@@ -84,10 +125,10 @@ public class MainMenuPanel extends JPanel {
             }
         });
 
-        // Top mini toolbar (upper-right ghost buttons)
+        // Top mini toolbar
         add(createTopBar(), BorderLayout.NORTH);
 
-        // Center: Left-aligned game menu list
+        // Center: 2-Column Balanced Dashboard
         add(createMenuArea(), BorderLayout.CENTER);
 
         // Bottom Bar: Profile on left, Controller prompts on right
@@ -113,20 +154,55 @@ public class MainMenuPanel extends JPanel {
             repaint();
         });
         tickerTimer.start();
+
+        // Initialize Background Interactive Circular Dots ("bilog bilog or dots nasa bg")
+        initBackgroundParticles(110);
+
+        // Background particles animation & smooth physics timer (~33 FPS)
+        bgParticleTimer = new Timer(30, e -> {
+            updateBackgroundParticles();
+            repaint();
+        });
+        bgParticleTimer.start();
+
+        // Interactive mouse tracking across the entire window for background particles
+        try {
+            Toolkit.getDefaultToolkit().addAWTEventListener(event -> {
+                if (event instanceof MouseEvent) {
+                    MouseEvent me = (MouseEvent) event;
+                    if (isShowing()) {
+                        try {
+                            Point p = SwingUtilities.convertPoint(me.getComponent(), me.getPoint(), MainMenuPanel.this);
+                            mouseX = p.x;
+                            mouseY = p.y;
+                        } catch (Exception ignored) {}
+                    }
+                }
+            }, AWTEvent.MOUSE_MOTION_EVENT_MASK);
+        } catch (Exception ignored) {}
+
+        addMouseMotionListener(new MouseMotionAdapter() {
+            @Override
+            public void mouseMoved(MouseEvent e) {
+                mouseX = e.getX();
+                mouseY = e.getY();
+            }
+        });
     }
 
     private JPanel createTopBar() {
-        JPanel bar = new JPanel(new FlowLayout(FlowLayout.RIGHT, 12, 10));
+        JPanel bar = new JPanel(new FlowLayout(FlowLayout.RIGHT, 14, 14));
         bar.setOpaque(false);
+        bar.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 36));
 
-        JButton btnSwitch = createMinimalTopButton("👤 SWITCH PLAYER");
-        btnSwitch.addActionListener(e -> parentFrame.showScreen(ArcadeOS.SCREEN_LOGIN));
+        JButton btnSwitch = createTopArcadeButton("U", "SWITCH OPERATOR", RetroTheme.ACCENT_CYAN,
+                e -> parentFrame.showScreen(ArcadeOS.SCREEN_LOGIN));
 
-        JButton btnLeader = createMinimalTopButton("🏆 LEADERBOARD");
-        btnLeader.addActionListener(e -> showLeaderboard());
+        JButton btnLeader = createTopArcadeButton("L", "LEADERBOARD", RetroTheme.ACCENT_YELLOW,
+                e -> showLeaderboard());
 
-        JButton btnLogout = createMinimalTopButton("⏻ LOG OUT");
-        btnLogout.addActionListener(e -> parentFrame.showScreen(ArcadeOS.SCREEN_LOGIN));
+        JButton btnLogout = createTopArcadeButton("X", "LOG OUT", RetroTheme.ACCENT_PINK,
+                e -> parentFrame.showScreen(ArcadeOS.SCREEN_LOGIN));
 
         bar.add(btnSwitch);
         bar.add(btnLeader);
@@ -134,93 +210,167 @@ public class MainMenuPanel extends JPanel {
         return bar;
     }
 
-    private JButton createMinimalTopButton(String text) {
-        JButton btn = new JButton(text);
-        btn.setFont(new Font("Consolas", Font.BOLD, 10));
-        btn.setForeground(new Color(180, 180, 200, 180));
+    private JButton createTopArcadeButton(String key, String label, Color accentColor, ActionListener action) {
+        JButton btn = new JButton() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+
+                int w = getWidth();
+                int h = getHeight();
+                boolean hover = getModel().isRollover();
+
+                // 1. Solid frosted dark backdrop (100% contrast against trees, lamps, and bright pixels)
+                Color bg = hover
+                        ? new Color(26, 18, 48, 245)
+                        : new Color(14, 10, 26, 230);
+                g2.setColor(bg);
+                g2.fillRoundRect(0, 0, w, h, 8, 8);
+
+                // Subtle inner top gloss highlight
+                g2.setColor(new Color(255, 255, 255, hover ? 35 : 18));
+                g2.fillRoundRect(1, 1, w - 2, h / 2 - 1, 7, 7);
+
+                // 2. High-contrast Neon Accent Border
+                Color borderColor = hover ? accentColor : new Color(accentColor.getRed(), accentColor.getGreen(), accentColor.getBlue(), 160);
+                g2.setColor(borderColor);
+                g2.setStroke(new BasicStroke(hover ? 1.8f : 1.2f));
+                g2.drawRoundRect(0, 0, w - 1, h - 1, 8, 8);
+
+                // If hovered, bottom accent glow bar
+                if (hover) {
+                    g2.setColor(accentColor);
+                    g2.fillRect(6, h - 3, w - 12, 2);
+                }
+
+                // 3. 3D Keycap Box on Left for "[ U ]"
+                int keyBoxW = 24;
+                int keyBoxH = h - 10;
+                int keyBoxX = 6;
+                int keyBoxY = 5;
+
+                g2.setColor(new Color(36, 26, 56));
+                g2.fillRoundRect(keyBoxX, keyBoxY, keyBoxW, keyBoxH, 4, 4);
+                g2.setColor(hover ? accentColor : new Color(accentColor.getRed(), accentColor.getGreen(), accentColor.getBlue(), 140));
+                g2.setStroke(new BasicStroke(1.0f));
+                g2.drawRoundRect(keyBoxX, keyBoxY, keyBoxW, keyBoxH, 4, 4);
+
+                // Key letter centered
+                g2.setFont(new Font("Consolas", Font.BOLD, 11));
+                FontMetrics fm = g2.getFontMetrics();
+                int kw = fm.stringWidth(key);
+                g2.setColor(hover ? Color.WHITE : accentColor);
+                g2.drawString(key, keyBoxX + (keyBoxW - kw) / 2, keyBoxY + (keyBoxH + fm.getAscent() - fm.getDescent()) / 2);
+
+                // 4. Action Text Label
+                g2.setFont(new Font("Consolas", Font.BOLD, 11));
+                g2.setColor(hover ? Color.WHITE : new Color(235, 230, 250));
+                g2.drawString(label, keyBoxX + keyBoxW + 8, (h + fm.getAscent() - fm.getDescent()) / 2);
+
+                g2.dispose();
+            }
+        };
+
+        // Measure preferred size to comfortably fit keycap + label + padding
+        Font font = new Font("Consolas", Font.BOLD, 11);
+        FontMetrics fm = btn.getFontMetrics(font);
+        int textW = fm.stringWidth(label);
+        int totalW = 6 + 24 + 8 + textW + 14;
+        btn.setPreferredSize(new Dimension(totalW, 32));
+
         btn.setFocusPainted(false);
         btn.setOpaque(false);
         btn.setContentAreaFilled(false);
-        btn.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(new Color(255, 255, 255, 35), 1),
-                BorderFactory.createEmptyBorder(5, 12, 5, 12)
-        ));
+        btn.setBorder(BorderFactory.createEmptyBorder());
         btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        btn.addActionListener(action);
+
         btn.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseEntered(MouseEvent e) {
-                btn.setForeground(RetroTheme.ACCENT_CYAN);
-                btn.setBorder(BorderFactory.createCompoundBorder(
-                        BorderFactory.createLineBorder(new Color(5, 217, 232, 120), 1),
-                        BorderFactory.createEmptyBorder(5, 12, 5, 12)
-                ));
-            }
-            @Override
-            public void mouseExited(MouseEvent e) {
-                btn.setForeground(new Color(180, 180, 200, 180));
-                btn.setBorder(BorderFactory.createCompoundBorder(
-                        BorderFactory.createLineBorder(new Color(255, 255, 255, 35), 1),
-                        BorderFactory.createEmptyBorder(5, 12, 5, 12)
-                ));
+                ArchivesPanel.playTone(1100, 20, 0.25f);
             }
         });
+
         return btn;
     }
 
-    /** Center Game Menu Area: Big Title + Left-Aligned Direct Text Menu */
+    /** Clean, Vertically Balanced Left-Aligned Game Menu Area */
     private JPanel createMenuArea() {
-        JPanel container = new JPanel();
-        container.setOpaque(false);
-        container.setLayout(new BoxLayout(container, BoxLayout.Y_AXIS));
-        container.setBorder(BorderFactory.createEmptyBorder(20, 70, 20, 40));
+        JPanel outer = new JPanel();
+        outer.setOpaque(false);
+        outer.setLayout(new BoxLayout(outer, BoxLayout.Y_AXIS));
+        outer.setBorder(BorderFactory.createEmptyBorder(10, 80, 20, 40));
 
-        // Push content down a bit from top
-        container.add(Box.createVerticalGlue());
+        outer.add(Box.createVerticalGlue());
 
-        // 1. Small red/pink sub-tag (like Homefront's Korean text)
-        JLabel subTag = new JLabel("메인 메뉴 // ARCADE EDITION");
+        // 1. Subtag
+        JLabel subTag = new JLabel("SYSTEM ROOT // ARCADE EDITION");
         subTag.setFont(new Font("Consolas", Font.BOLD, 11));
         subTag.setForeground(RetroTheme.ACCENT_PINK);
         subTag.setAlignmentX(Component.LEFT_ALIGNMENT);
-        container.add(subTag);
+        outer.add(subTag);
 
-        container.add(Box.createVerticalStrut(2));
+        outer.add(Box.createVerticalStrut(4));
 
-        // 2. Huge Game Title: MINI // OS
+        // 2. Title Row: MINI // OS
         JPanel titleRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
         titleRow.setOpaque(false);
         titleRow.setAlignmentX(Component.LEFT_ALIGNMENT);
-        titleRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, 70));
+        titleRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, 65));
 
         JLabel lblMini = new JLabel("MINI ");
-        lblMini.setFont(new Font("Consolas", Font.BOLD, 60));
+        lblMini.setFont(new Font("Consolas", Font.BOLD, 54));
         lblMini.setForeground(Color.WHITE);
-
         JLabel lblSlash = new JLabel("// ");
-        lblSlash.setFont(new Font("Consolas", Font.BOLD, 60));
+        lblSlash.setFont(new Font("Consolas", Font.BOLD, 54));
         lblSlash.setForeground(RetroTheme.ACCENT_PINK);
-
         JLabel lblOs = new JLabel("OS");
-        lblOs.setFont(new Font("Consolas", Font.BOLD, 60));
+        lblOs.setFont(new Font("Consolas", Font.BOLD, 54));
         lblOs.setForeground(Color.WHITE);
-
         titleRow.add(lblMini);
         titleRow.add(lblSlash);
         titleRow.add(lblOs);
-        container.add(titleRow);
+        outer.add(titleRow);
 
-        container.add(Box.createVerticalStrut(2));
+        outer.add(Box.createVerticalStrut(3));
 
         // 3. Tagline
-        JLabel lblTag = new JLabel("KAWAII 8-BIT OPERATING SYSTEM SIMULATOR");
-        lblTag.setFont(new Font("Consolas", Font.BOLD, 11));
-        lblTag.setForeground(RetroTheme.ACCENT_CYAN);
-        lblTag.setAlignmentX(Component.LEFT_ALIGNMENT);
-        container.add(lblTag);
+        JLabel tagLine = new JLabel("8-BIT RETRO OPERATING SYSTEM SIMULATOR");
+        tagLine.setFont(new Font("Consolas", Font.BOLD, 12));
+        tagLine.setForeground(RetroTheme.ACCENT_CYAN);
+        tagLine.setAlignmentX(Component.LEFT_ALIGNMENT);
+        tagLine.setMaximumSize(new Dimension(Integer.MAX_VALUE, 20));
+        outer.add(tagLine);
 
-        container.add(Box.createVerticalStrut(40));
+        outer.add(Box.createVerticalStrut(14));
 
-        // 4. Vertical Game Text Menu Items (clean, pure text like Homefront)
+        // 4. Subtle accent line
+        JPanel divider = new JPanel() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                super.paintComponent(g);
+                Graphics2D g2 = (Graphics2D) g.create();
+                GradientPaint gp = new GradientPaint(
+                    0, 0, RetroTheme.ACCENT_PINK,
+                    420, 0, new Color(5, 217, 232, 0)
+                );
+                g2.setPaint(gp);
+                g2.fillRect(0, 0, getWidth(), 2);
+                g2.dispose();
+            }
+        };
+        divider.setMaximumSize(new Dimension(420, 2));
+        divider.setPreferredSize(new Dimension(420, 2));
+        divider.setAlignmentX(Component.LEFT_ALIGNMENT);
+        divider.setOpaque(false);
+        outer.add(divider);
+
+        outer.add(Box.createVerticalStrut(32));
+
+        // 5. Menu items list
         menuListPanel = new JPanel();
         menuListPanel.setOpaque(false);
         menuListPanel.setLayout(new BoxLayout(menuListPanel, BoxLayout.Y_AXIS));
@@ -228,25 +378,28 @@ public class MainMenuPanel extends JPanel {
 
         for (int i = 0; i < menuTitles.length; i++) {
             final int idx = i;
+            boolean isSel = (idx == selectedMenuIndex);
+
             JPanel itemRow = new JPanel() {
                 @Override
                 protected void paintComponent(Graphics g) {
                     super.paintComponent(g);
                     if (selectedMenuIndex == idx) {
-                        // Pink neon indicator bar on left (like Homefront's yellow highlight)
                         Graphics2D g2 = (Graphics2D) g.create();
                         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+                        // Left neon accent bar
                         int barAlpha = (int)(pulseAlpha * 255);
                         g2.setColor(new Color(255, 42, 141, barAlpha));
-                        g2.fillRect(0, 4, 3, getHeight() - 8);
+                        g2.fillRoundRect(0, 2, 4, getHeight() - 4, 2, 2);
 
-                        // Subtle horizontal glow behind selected item
+                        // Subtle horizontal gradient glow
                         GradientPaint glowH = new GradientPaint(
-                            0, 0, new Color(255, 42, 141, 25),
-                            280, 0, new Color(255, 42, 141, 0)
+                            0, 0, new Color(255, 42, 141, 35),
+                            460, 0, new Color(255, 42, 141, 0)
                         );
                         g2.setPaint(glowH);
-                        g2.fillRect(0, 0, 280, getHeight());
+                        g2.fillRect(0, 0, 460, getHeight());
                         g2.dispose();
                     }
                 }
@@ -254,69 +407,76 @@ public class MainMenuPanel extends JPanel {
             itemRow.setOpaque(false);
             itemRow.setLayout(new BoxLayout(itemRow, BoxLayout.Y_AXIS));
             itemRow.setAlignmentX(Component.LEFT_ALIGNMENT);
-            itemRow.setBorder(BorderFactory.createEmptyBorder(8, 14, 8, 14));
+            itemRow.setBorder(BorderFactory.createEmptyBorder(6, 16, 6, 16));
+            itemRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, 58));
             itemRow.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-            itemRow.setMaximumSize(new Dimension(500, 60));
 
-            // Main Menu Item Title
-            boolean isSel = (selectedMenuIndex == idx);
-            JLabel lblItem = new JLabel(menuTitles[i]);
-            lblItem.setFont(new Font("Consolas", Font.BOLD, isSel ? 24 : 22));
-            lblItem.setForeground(isSel ? RetroTheme.ACCENT_PINK : new Color(220, 220, 235));
-            lblItem.setName("menu-title-" + i);
+            JLabel lblItem = new JLabel((isSel ? ">> " : "   ") + menuTitles[i]);
+            lblItem.setName("lblTitle");
+            lblItem.setFont(new Font("Consolas", Font.BOLD, isSel ? 23 : 21));
+            lblItem.setForeground(isSel ? Color.WHITE : new Color(210, 210, 230));
+            lblItem.setAlignmentX(Component.LEFT_ALIGNMENT);
+            lblItem.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
             itemRow.add(lblItem);
 
-            // Subtitle hint (only visible on selected)
-            JLabel lblSub = new JLabel(menuSubtitles[i]);
-            lblSub.setFont(new Font("Consolas", Font.PLAIN, 10));
-            lblSub.setForeground(isSel ? RetroTheme.ACCENT_CYAN : new Color(150, 150, 170, 0));
-            lblSub.setName("menu-sub-" + i);
+            itemRow.add(Box.createVerticalStrut(2));
+
+            JLabel lblSub = new JLabel("      " + menuSubtitles[i]);
+            lblSub.setName("lblSub");
+            lblSub.setFont(new Font("Consolas", Font.PLAIN, 11));
+            lblSub.setForeground(isSel ? RetroTheme.ACCENT_CYAN : new Color(135, 135, 160));
+            lblSub.setAlignmentX(Component.LEFT_ALIGNMENT);
+            lblSub.setMaximumSize(new Dimension(Integer.MAX_VALUE, 20));
             itemRow.add(lblSub);
 
             itemRow.addMouseListener(new MouseAdapter() {
                 @Override
                 public void mouseEntered(MouseEvent e) {
-                    selectedMenuIndex = idx;
-                    updateMenuStyles();
-                    repaint();
+                    if (selectedMenuIndex != idx) {
+                        selectedMenuIndex = idx;
+                        ArchivesPanel.playTone(920, 20, 0.3f);
+                        updateMenuStyles();
+                        repaint();
+                    }
                 }
                 @Override
                 public void mouseClicked(MouseEvent e) {
+                    ArchivesPanel.playTone(1200, 70, 0.5f);
                     triggerMenuAction(idx);
                 }
             });
 
             menuListPanel.add(itemRow);
+            menuListPanel.add(Box.createVerticalStrut(18));
         }
 
-        container.add(menuListPanel);
-        container.add(Box.createVerticalGlue());
+        outer.add(menuListPanel);
+        outer.add(Box.createVerticalGlue());
 
-        return container;
+        return outer;
     }
 
     private void updateMenuStyles() {
         if (menuListPanel == null) return;
-        int compCount = menuListPanel.getComponentCount();
         int itemIdx = 0;
-        for (int i = 0; i < compCount; i++) {
+        for (int i = 0; i < menuListPanel.getComponentCount(); i++) {
             Component c = menuListPanel.getComponent(i);
             if (c instanceof JPanel) {
                 JPanel row = (JPanel) c;
+                boolean isSel = (itemIdx == selectedMenuIndex);
+
                 for (Component child : row.getComponents()) {
-                    if (child instanceof JLabel) {
-                        JLabel lbl = (JLabel) child;
-                        String name = lbl.getName();
-                        if (name != null && name.startsWith("menu-title-")) {
-                            boolean isSel = (itemIdx == selectedMenuIndex);
-                            lbl.setFont(new Font("Consolas", Font.BOLD, isSel ? 24 : 22));
-                            lbl.setForeground(isSel ? RetroTheme.ACCENT_PINK : new Color(220, 220, 235));
-                        } else if (name != null && name.startsWith("menu-sub-")) {
-                            boolean isSel = (itemIdx == selectedMenuIndex);
-                            lbl.setForeground(isSel ? RetroTheme.ACCENT_CYAN : new Color(150, 150, 170, 0));
-                        }
+                    if ("lblTitle".equals(child.getName()) && child instanceof JLabel) {
+                        JLabel l = (JLabel) child;
+                        l.setText((isSel ? ">> " : "   ") + menuTitles[itemIdx]);
+                        l.setFont(new Font("Consolas", Font.BOLD, isSel ? 23 : 21));
+                        l.setForeground(isSel ? Color.WHITE : new Color(210, 210, 230));
+                    } else if ("lblSub".equals(child.getName()) && child instanceof JLabel) {
+                        JLabel l = (JLabel) child;
+                        l.setForeground(isSel ? RetroTheme.ACCENT_CYAN : new Color(135, 135, 160));
                     }
                 }
+                row.repaint();
                 itemIdx++;
             }
         }
@@ -326,26 +486,21 @@ public class MainMenuPanel extends JPanel {
     private JPanel createBottomBar() {
         JPanel bar = new JPanel(new BorderLayout(20, 0));
         bar.setOpaque(false);
-        bar.setBorder(BorderFactory.createEmptyBorder(8, 70, 16, 70));
+        bar.setBorder(BorderFactory.createEmptyBorder(8, 80, 16, 60));
 
-        // Bottom Left: Player Profile & Session info
+        // Bottom Left: Player Profile & Scrolling Ticker
         JPanel leftBox = new JPanel();
         leftBox.setOpaque(false);
         leftBox.setLayout(new BoxLayout(leftBox, BoxLayout.Y_AXIS));
 
-        JPanel profileRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
-        profileRow.setOpaque(false);
-        JLabel icon = new JLabel("👤");
-        icon.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 13));
-        profileRow.add(icon);
-
-        JLabel lblProfile = new JLabel("PROFILE: " + AppState.playerName);
+        JLabel lblProfile = new JLabel("[*] OPERATOR: " + AppState.playerName + "   |   STATUS: NOMINAL");
         lblProfile.setFont(new Font("Consolas", Font.BOLD, 12));
         lblProfile.setForeground(Color.WHITE);
-        profileRow.add(lblProfile);
-        leftBox.add(profileRow);
+        lblProfile.setMaximumSize(new Dimension(Integer.MAX_VALUE, 20));
+        lblProfile.setPreferredSize(new Dimension(460, 20));
+        leftBox.add(lblProfile);
 
-        // Scrolling ticker (like Homefront's RSS feed)
+        // Scrolling ticker
         JPanel tickerRow = new JPanel() {
             @Override
             protected void paintComponent(Graphics g) {
@@ -355,27 +510,26 @@ public class MainMenuPanel extends JPanel {
                 g2.setColor(RetroTheme.ACCENT_PINK);
                 g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
                 String ticker = "// BUILD 01.09 // EDUCATION CORE // HI-SCORE: " +
-                    AppState.getScoreFormatted() + " // STATUS: NOMINAL // MINI//OS ARCADE SYSTEM ONLINE // ";
-                // Draw ticker twice for seamless looping
+                    AppState.getScoreFormatted() + " // MINI//OS ARCADE SYSTEM ONLINE // ";
                 int x = (int) tickerOffset;
                 g2.drawString(ticker + ticker, x, 11);
                 g2.dispose();
             }
             @Override
-            public Dimension getPreferredSize() { return new Dimension(400, 16); }
+            public Dimension getPreferredSize() { return new Dimension(540, 16); }
         };
         tickerRow.setOpaque(false);
-        tickerRow.setBorder(BorderFactory.createEmptyBorder(2, 22, 0, 0));
+        tickerRow.setBorder(BorderFactory.createEmptyBorder(2, 0, 0, 0));
         leftBox.add(tickerRow);
 
         bar.add(leftBox, BorderLayout.WEST);
 
         // Bottom Right: Game Controller Prompts
-        JPanel rightBox = new JPanel(new FlowLayout(FlowLayout.RIGHT, 16, 4));
+        JPanel rightBox = new JPanel(new FlowLayout(FlowLayout.RIGHT, 14, 2));
         rightBox.setOpaque(false);
 
         JLabel prompt1 = createPromptPill("ENTER", "SELECT", RetroTheme.ACCENT_CYAN);
-        JLabel prompt2 = createPromptPill("▲/▼", "NAVIGATE", RetroTheme.ACCENT_YELLOW);
+        JLabel prompt2 = createPromptPill("W/S", "NAVIGATE", RetroTheme.ACCENT_YELLOW);
         JLabel prompt3 = createPromptPill("ESC", "QUIT", RetroTheme.ACCENT_PINK);
 
         rightBox.add(prompt1);
@@ -397,6 +551,29 @@ public class MainMenuPanel extends JPanel {
         return String.format("#%02x%02x%02x", c.getRed(), c.getGreen(), c.getBlue());
     }
 
+    /** Pixelation filter: downscales image to retro pixel resolution and upscales with nearest-neighbor */
+    private java.awt.image.BufferedImage applyPixelFilter(java.awt.image.BufferedImage src, int pixelBlockSize) {
+        if (src == null || pixelBlockSize <= 1) return src;
+        int w = src.getWidth();
+        int h = src.getHeight();
+        int smallW = Math.max(1, w / pixelBlockSize);
+        int smallH = Math.max(1, h / pixelBlockSize);
+
+        java.awt.image.BufferedImage small = new java.awt.image.BufferedImage(smallW, smallH, java.awt.image.BufferedImage.TYPE_INT_RGB);
+        Graphics2D gSmall = small.createGraphics();
+        gSmall.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+        gSmall.drawImage(src, 0, 0, smallW, smallH, null);
+        gSmall.dispose();
+
+        java.awt.image.BufferedImage pixelated = new java.awt.image.BufferedImage(w, h, java.awt.image.BufferedImage.TYPE_INT_RGB);
+        Graphics2D gPix = pixelated.createGraphics();
+        gPix.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
+        gPix.drawImage(small, 0, 0, w, h, null);
+        gPix.dispose();
+
+        return pixelated;
+    }
+
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
@@ -406,14 +583,13 @@ public class MainMenuPanel extends JPanel {
         int w = getWidth();
         int h = getHeight();
 
-        // 1. Draw Full-Bleed Background Image across the entire canvas
+        // 1. Draw Full-Bleed 16-Bit Background Image across the entire canvas
         if (bgImage != null) {
-            g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-            // Cover-fit: fill entire panel, crop if aspect mismatch
+            g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
             double imgW = bgImage.getWidth(null);
             double imgH = bgImage.getHeight(null);
-            double scaleX = w / imgW;
-            double scaleY = h / imgH;
+            double scaleX = (double) w / imgW;
+            double scaleY = (double) h / imgH;
             double scale = Math.max(scaleX, scaleY);
             int drawW = (int)(imgW * scale);
             int drawH = (int)(imgH * scale);
@@ -425,18 +601,16 @@ public class MainMenuPanel extends JPanel {
             g2.fillRect(0, 0, w, h);
         }
 
-        // 2. Cinematic LEFT-HEAVY Dark Gradient Overlay (Homefront style)
-        // The left ~45% is nearly opaque dark for perfect text readability
-        // Then it feathers out to transparent showing the full background art on the right
-        float[] fractions = { 0.0f, 0.30f, 0.42f, 0.52f, 0.62f, 0.75f, 1.0f };
+        // 2. Cinematic Half-Dark Gradient:
+        // Left ~40% is solid dark for perfect readability, feathers smoothly between 40% and 62%
+        // Right side is transparent showing the 16-bit arcade room
+        float[] fractions = { 0.0f, 0.38f, 0.48f, 0.62f, 1.0f };
         Color[] colors = {
-            new Color(6, 4, 14, 250),   // Nearly solid at left edge
-            new Color(6, 4, 14, 245),   // Still solid behind menu text area
-            new Color(6, 4, 14, 200),   // Start of gentle fade
-            new Color(6, 4, 14, 120),   // Midway transparency
-            new Color(6, 4, 14, 50),    // Nearly transparent
-            new Color(6, 4, 14, 10),    // Barely there
-            new Color(6, 4, 14, 0)      // Fully transparent — shows background art
+            new Color(6, 4, 14, 250),
+            new Color(6, 4, 14, 240),
+            new Color(6, 4, 14, 160),
+            new Color(6, 4, 14, 40),
+            new Color(6, 4, 14, 0)
         };
         LinearGradientPaint leftFade = new LinearGradientPaint(
             new Point2D.Float(0, 0),
@@ -447,25 +621,196 @@ public class MainMenuPanel extends JPanel {
         g2.setPaint(leftFade);
         g2.fillRect(0, 0, w, h);
 
-        // 3. Bottom vignette for bottom bar text readability
+        // 2.5 INTERACTIVE BACKGROUND PARTICLES ("bilog bilog or dots nasa bg sya")
+        // Rendered strictly in background layer (behind menu text and buttons)
+        paintBackgroundParticles(g2, w, h);
+
+        // 3. Bottom vignette for bottom bar readability
         Paint gradBottom = new GradientPaint(
-                0, h - 80, new Color(6, 4, 14, 0),
-                0, h, new Color(6, 4, 14, 210)
+            0, h - 70, new Color(6, 4, 14, 0),
+            0, h, new Color(6, 4, 14, 210)
         );
         g2.setPaint(gradBottom);
-        g2.fillRect(0, h - 80, w, 80);
+        g2.fillRect(0, h - 70, w, 70);
 
-        // 4. Subtle top vignette for the top right toolbar area
-        Paint gradTop = new GradientPaint(
-                0, 0, new Color(6, 4, 14, 140),
-                0, 50, new Color(6, 4, 14, 0)
-        );
-        g2.setPaint(gradTop);
-        g2.fillRect(0, 0, w, 50);
+        // 4. Subtle CRT horizontal scanlines
+        g2.setColor(new Color(0, 0, 0, 22));
+        for (int y = 0; y < h; y += 4) {
+            g2.drawLine(0, y, w, y);
+        }
 
-        // 5. Very subtle overall film grain / noise tint for cinematic feel
-        g2.setColor(new Color(0, 0, 0, 15));
-        g2.fillRect(0, 0, w, h);
+        g2.dispose();
+    }
+
+    private void initBackgroundParticles(int count) {
+        bgDots.clear();
+        java.util.Random rnd = new java.util.Random(1337);
+        for (int i = 0; i < count; i++) {
+            float px = rnd.nextFloat() * 1920f;
+            float py = rnd.nextFloat() * 1080f;
+            float vx = (rnd.nextFloat() - 0.5f) * 0.75f;
+            float vy = (rnd.nextFloat() - 0.5f) * 0.75f;
+
+            // Varied tiny sizes ("iba iba pero maliliit")
+            float randTier = rnd.nextFloat();
+            float r;
+            if (randTier < 0.45f) {
+                // Tier 1: Micro stardust dot (1.0px - 1.5px)
+                r = 1.0f + rnd.nextFloat() * 0.55f;
+            } else if (randTier < 0.82f) {
+                // Tier 2: Small glowing ember (1.6px - 2.2px)
+                r = 1.6f + rnd.nextFloat() * 0.65f;
+            } else {
+                // Tier 3: Medium accent micro-orb (2.3px - 2.8px)
+                r = 2.3f + rnd.nextFloat() * 0.55f;
+            }
+
+            float a = 0.40f + rnd.nextFloat() * 0.55f; // alpha 0.40 to 0.95
+            float phase = rnd.nextFloat() * 6.28f;
+            Color c = DOT_COLORS[rnd.nextInt(DOT_COLORS.length)];
+            bgDots.add(new BgDotParticle(px, py, vx, vy, r, a, phase, c));
+        }
+    }
+
+    private void updateBackgroundParticles() {
+        int w = getWidth() > 0 ? getWidth() : 1280;
+        int h = getHeight() > 0 ? getHeight() : 860;
+
+        // Smooth mouse tracking interpolation
+        if (mouseX >= 0 && mouseY >= 0) {
+            if (smoothMouseX < 0) {
+                smoothMouseX = mouseX;
+                smoothMouseY = mouseY;
+            } else {
+                smoothMouseX += (mouseX - smoothMouseX) * 0.14f;
+                smoothMouseY += (mouseY - smoothMouseY) * 0.14f;
+            }
+        }
+
+        for (BgDotParticle p : bgDots) {
+            p.pulsePhase += 0.05f;
+            // Subtle, delicate pulsing for tiny dots
+            p.currentRadius = p.baseRadius + (float) Math.sin(p.pulsePhase) * 0.35f;
+
+            // Gravitational attraction to mouse cursor in background
+            if (smoothMouseX >= 0 && smoothMouseY >= 0) {
+                float dx = smoothMouseX - p.x;
+                float dy = smoothMouseY - p.y;
+                float distSq = dx * dx + dy * dy;
+                float dist = (float) Math.sqrt(distSq);
+
+                if (dist < 300f && dist > 1f) {
+                    float ndx = dx / dist;
+                    float ndy = dy / dist;
+
+                    float pullFactor = (1.0f - dist / 300f);
+                    float pullForce = pullFactor * 0.36f;
+
+                    // If dots get too close (< 40px), apply gentle repulsion/swirl so they orbit gracefully
+                    if (dist < 40f) {
+                        float pushFactor = (1.0f - dist / 40f) * 0.45f;
+                        pullForce -= pushFactor;
+                    }
+
+                    p.vx += ndx * pullForce;
+                    p.vy += ndy * pullForce;
+
+                    // Subtle tangential swirl force
+                    float perpX = -ndy;
+                    float perpY = ndx;
+                    p.vx += perpX * (pullFactor * 0.18f);
+                    p.vy += perpY * (pullFactor * 0.18f);
+                }
+            }
+
+            // Damping / friction
+            p.vx *= 0.965f;
+            p.vy *= 0.965f;
+
+            // Ambient gentle drift minimum speed
+            float speed = (float) Math.sqrt(p.vx * p.vx + p.vy * p.vy);
+            if (speed < 0.18f) {
+                p.vx += ((float) Math.random() - 0.5f) * 0.12f;
+                p.vy += ((float) Math.random() - 0.5f) * 0.12f;
+            } else if (speed > 3.2f) {
+                p.vx = (p.vx / speed) * 3.2f;
+                p.vy = (p.vy / speed) * 3.2f;
+            }
+
+            p.x += p.vx;
+            p.y += p.vy;
+
+            // Screen edge wrapping with margin
+            if (p.x < -20) p.x = w + 20;
+            else if (p.x > w + 20) p.x = -20;
+            if (p.y < -20) p.y = h + 20;
+            else if (p.y > h + 20) p.y = -20;
+        }
+    }
+
+    private void paintBackgroundParticles(Graphics2D g, int w, int h) {
+        Graphics2D g2 = (Graphics2D) g.create();
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+        // 1. Constellation / connecting lines between nearby tiny background dots (delicate, subtle web)
+        int numDots = bgDots.size();
+        for (int i = 0; i < numDots; i++) {
+            BgDotParticle p1 = bgDots.get(i);
+            for (int j = i + 1; j < numDots; j++) {
+                BgDotParticle p2 = bgDots.get(j);
+                float dx = p1.x - p2.x;
+                float dy = p1.y - p2.y;
+                float distSq = dx * dx + dy * dy;
+                if (distSq < 3600f) { // 60px
+                    float dist = (float) Math.sqrt(distSq);
+                    int lineAlpha = (int) ((1.0f - dist / 60f) * 26f);
+                    if (lineAlpha > 0) {
+                        g2.setColor(new Color(p1.color.getRed(), p1.color.getGreen(), p1.color.getBlue(), lineAlpha));
+                        g2.setStroke(new BasicStroke(0.65f));
+                        g2.drawLine((int) p1.x, (int) p1.y, (int) p2.x, (int) p2.y);
+                    }
+                }
+            }
+        }
+
+        // 2. Cursor tether lines: soft connection lines drawn from cursor to nearest background dots
+        if (smoothMouseX >= 0 && smoothMouseY >= 0) {
+            for (BgDotParticle p : bgDots) {
+                float dx = smoothMouseX - p.x;
+                float dy = smoothMouseY - p.y;
+                float distSq = dx * dx + dy * dy;
+                if (distSq < 14400f) { // 120px
+                    float dist = (float) Math.sqrt(distSq);
+                    int tetherAlpha = (int) ((1.0f - dist / 120f) * 55f);
+                    if (tetherAlpha > 0) {
+                        g2.setColor(new Color(p.color.getRed(), p.color.getGreen(), p.color.getBlue(), tetherAlpha));
+                        g2.setStroke(new BasicStroke(0.85f));
+                        g2.drawLine((int) smoothMouseX, (int) smoothMouseY, (int) p.x, (int) p.y);
+                    }
+                }
+            }
+        }
+
+        // 3. Render circular dots ("bilog bilog or dots, iba iba pero maliliit")
+        for (BgDotParticle p : bgDots) {
+            // Soft glowing outer halo (compact 1.9x ratio)
+            float haloR = p.currentRadius * 1.9f;
+            int haloAlpha = Math.min(255, (int) (p.alpha * 42f));
+            g2.setColor(new Color(p.color.getRed(), p.color.getGreen(), p.color.getBlue(), haloAlpha));
+            g2.fillOval((int) (p.x - haloR), (int) (p.y - haloR), (int) (haloR * 2), (int) (haloR * 2));
+
+            // Vibrant solid inner circular core
+            float coreR = p.currentRadius;
+            int coreAlpha = Math.min(255, (int) (p.alpha * 230f));
+            g2.setColor(new Color(p.color.getRed(), p.color.getGreen(), p.color.getBlue(), coreAlpha));
+            g2.fillOval((int) (p.x - coreR), (int) (p.y - coreR), (int) (coreR * 2), (int) (coreR * 2));
+
+            // Bright starlet center pip only for larger micro-dots
+            if (coreR >= 2.2f) {
+                g2.setColor(new Color(255, 255, 255, Math.min(255, (int) (p.alpha * 220f))));
+                g2.fillOval((int) (p.x - 0.75f), (int) (p.y - 0.75f), 1, 1);
+            }
+        }
 
         g2.dispose();
     }
@@ -528,7 +873,7 @@ public class MainMenuPanel extends JPanel {
             "  Academic Yr: 2026\n\n" +
             "[ TECH STACK & ARCHITECTURE ]\n" +
             "  Architecture : Modular Object-Oriented Programming (Java / OOP)\n" +
-            "  UI Engine    : Custom Java2D Synthwave & Kawaii 8-Bit Retro Engine\n" +
+            "  UI Engine    : Custom Java2D Synthwave & 8-Bit Retro Arcade Engine\n" +
             "  Key Features : 8 OS Subsystem Simulators, Live Gantt Runways,\n" +
             "                 Multi-Module Interactive Quiz Arena, Dynamic Leaderboards\n\n" +
             "[ MODULE ENGINEERING CREDITS ]\n" +
