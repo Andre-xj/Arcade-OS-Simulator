@@ -204,16 +204,13 @@ public class ArchivesPanel extends JPanel {
         // 3. Clean Bottom Navigation Bar with 8-block segmented meter
         add(createBottomNav(), BorderLayout.SOUTH);
 
-        // Idle sprite float & neon pulse timer (60 FPS)
-        idleAnimTimer = new Timer(16, e -> {
+        // Idle animation timer (Static stability - zero bobbing oscillation)
+        idleAnimTimer = new Timer(500, e -> {
             pulseTicks++;
-            bobOffset = (float)(Math.sin(pulseTicks * 0.055) * 6.0);
-            glowPulse = (float)(0.60 + 0.38 * Math.sin(pulseTicks * 0.045));
-            if (isCarouselMode && carouselCanvas != null) {
-                carouselCanvas.repaint();
-            }
+            bobOffset = 0.0f; // Stable fixed position - no moving boxes or floating sprites
+            glowPulse = 0.85f;
         });
-        idleAnimTimer.start();
+        // Kept stopped to guarantee 100% rock-solid static rendering with zero jitter
 
         // Comprehensive Keyboard Navigation (Arrows, A/D, 1-8, Enter, M, Q, ESC, C)
         setFocusable(true);
@@ -2144,78 +2141,566 @@ public class ArchivesPanel extends JPanel {
     // ─────────────────────────────────────────────────────────────────────────
 
     private JPanel createGridView() {
-        JPanel grid = new JPanel(new GridLayout(2, 4, 12, 12));
-        grid.setOpaque(false);
-        grid.setBorder(BorderFactory.createEmptyBorder(6, 6, 6, 6));
-
-        for (int i = 0; i < cards.length; i++) {
-            grid.add(createArchiveCard(cards[i], i));
-        }
-        return grid;
-    }
-
-    private JPanel createArchiveCard(ArchiveCardData d, int idx) {
-        JPanel card = new JPanel(new BorderLayout(0, 6)) {
+        JPanel gridWrapper = new JPanel(new GridBagLayout()) {
             @Override
             protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(RetroTheme.CARD_BG);
-                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 12, 12);
-                g2.setColor(RetroTheme.BORDER_COLOR);
-                g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 12, 12);
+                int w = getWidth();
+                int h = getHeight();
+
+                // 1. Cyber Dot-Matrix Grid across background (dot dot)
+                g2.setColor(new Color(85, 60, 130, 42));
+                int dotSpacing = 28;
+                for (int x = dotSpacing / 2; x < w; x += dotSpacing) {
+                    for (int y = dotSpacing / 2; y < h; y += dotSpacing) {
+                        g2.fillRect(x, y, 2, 2);
+                    }
+                }
+
+                // 2. Floating Neon Constellation Particles
+                for (int i = 0; i < 75; i++) {
+                    int px = (i * 67 + 23) % w;
+                    int py = (i * 41 + 17) % h;
+                    int pSize = (i % 7 == 0) ? 3 : ((i % 3 == 0) ? 2 : 1);
+                    int alpha = 65 + (i * 19) % 155;
+                    if (i % 3 == 0) {
+                        g2.setColor(new Color(5, 217, 232, alpha)); // Cyan
+                    } else if (i % 3 == 1) {
+                        g2.setColor(new Color(255, 42, 109, alpha)); // Pink
+                    } else {
+                        g2.setColor(new Color(255, 211, 25, alpha)); // Gold
+                    }
+                    g2.fillOval(px, py, pSize, pSize);
+                }
+
+                // 3. Outrun Perspective Grid Lines at Bottom
+                int horizonY = h - 55;
+                g2.setColor(new Color(255, 42, 109, 28));
+                g2.drawLine(0, horizonY, w, horizonY);
+                for (int x = -100; x < w + 200; x += 65) {
+                    g2.drawLine(w / 2, horizonY, x, h);
+                }
+                for (int y = horizonY + 8; y < h; y += (y - horizonY + 4)) {
+                    g2.drawLine(0, y, w, y);
+                }
+
+                g2.dispose();
+                super.paintComponent(g);
+            }
+        };
+        gridWrapper.setOpaque(false);
+
+        JPanel grid = new JPanel(new GridLayout(2, 4, 12, 12));
+        grid.setOpaque(false);
+
+        for (int i = 0; i < cards.length; i++) {
+            JPanel card = createArchiveCard(cards[i], i);
+            card.setPreferredSize(new Dimension(300, 290));
+            grid.add(card);
+        }
+
+        gridWrapper.add(grid);
+        return gridWrapper;
+    }
+
+    private JPanel createArchiveCard(ArchiveCardData d, int idx) {
+        final Color themeColor = STAGE_THEME_COLORS[idx % STAGE_THEME_COLORS.length];
+
+        JPanel card = new JPanel(new BorderLayout(0, 4)) {
+            private boolean isHovered = false;
+            {
+                addMouseListener(new MouseAdapter() {
+                    @Override public void mouseEntered(MouseEvent e) { isHovered = true; repaint(); }
+                    @Override public void mouseExited(MouseEvent e) { isHovered = false; repaint(); }
+                    @Override public void mouseClicked(MouseEvent e) {
+                        playBlip();
+                        openManual(d.tabIndex, idx);
+                    }
+                });
+                setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+            }
+
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+                int w = getWidth();
+                int h = getHeight();
+
+                // 1. Draw rich procedural game-specific background
+                drawGameThemedBackground(g2, idx, w, h, themeColor, isHovered);
+
                 g2.dispose();
                 super.paintComponent(g);
             }
         };
         card.setOpaque(false);
-        card.setBorder(BorderFactory.createEmptyBorder(10, 12, 10, 12));
+        card.setBorder(BorderFactory.createEmptyBorder(8, 12, 12, 12));
 
+        // Top line: STAGE Number & Read Status Badge
         JPanel top = new JPanel(new BorderLayout());
         top.setOpaque(false);
+
         JLabel lblNum = new JLabel("STAGE " + d.num);
-        lblNum.setFont(new Font("Consolas", Font.BOLD, 12));
-        lblNum.setForeground(RetroTheme.ACCENT_CYAN);
+        lblNum.setFont(new Font("Consolas", Font.BOLD, 11));
+        lblNum.setForeground(themeColor);
+        lblNum.setPreferredSize(new Dimension(85, 20));
         top.add(lblNum, BorderLayout.WEST);
 
         boolean isRead = (AppState.filesRead[idx] == 1);
-        JLabel lblStatus = new JLabel(isRead ? "READ" : "UNREAD");
-        lblStatus.setFont(new Font("Consolas", Font.BOLD, 10));
+        JLabel lblStatus = new JLabel(isRead ? "[ READ +100XP ]" : "[ UNREAD ]") {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                boolean read = (AppState.filesRead[idx] == 1);
+                Color badgeC = read ? RetroTheme.ACCENT_GREEN : RetroTheme.ACCENT_YELLOW;
+                g2.setColor(new Color(badgeC.getRed() / 4, badgeC.getGreen() / 4, badgeC.getBlue() / 4, 180));
+                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 6, 6);
+                g2.setColor(badgeC);
+                g2.setStroke(new BasicStroke(1.0f));
+                g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 6, 6);
+                g2.dispose();
+                super.paintComponent(g);
+            }
+        };
+        lblStatus.setFont(new Font("Consolas", Font.BOLD, 9));
         lblStatus.setForeground(isRead ? RetroTheme.ACCENT_GREEN : RetroTheme.ACCENT_YELLOW);
+        lblStatus.setBorder(BorderFactory.createEmptyBorder(2, 7, 2, 7));
+        lblStatus.setOpaque(false);
         top.add(lblStatus, BorderLayout.EAST);
         card.add(top, BorderLayout.NORTH);
 
-        JPanel center = new JPanel(new BorderLayout(0, 4));
+        // Center Wrapper: Perfectly centers the content block vertically and horizontally
+        JPanel centerWrapper = new JPanel(new GridBagLayout());
+        centerWrapper.setOpaque(false);
+
+        JPanel center = new JPanel();
         center.setOpaque(false);
+        center.setLayout(new BoxLayout(center, BoxLayout.Y_AXIS));
 
-        JLabel icon = new JLabel(new ImageIcon(getCardSprite(idx, 40)));
-        icon.setHorizontalAlignment(SwingConstants.CENTER);
-        center.add(icon, BorderLayout.NORTH);
-
-        JPanel text = new JPanel(new GridLayout(2, 1, 0, 2));
-        text.setOpaque(false);
-        JLabel title = new JLabel(d.title, SwingConstants.CENTER);
-        title.setFont(new Font("Consolas", Font.BOLD, 12));
-        title.setForeground(Color.WHITE);
-        text.add(title);
-
-        JLabel sub = new JLabel(d.subtitle, SwingConstants.CENTER);
-        sub.setFont(new Font("Consolas", Font.BOLD, 9));
-        sub.setForeground(RetroTheme.ACCENT_PINK);
-        text.add(sub);
-        center.add(text, BorderLayout.CENTER);
-
-        card.add(center, BorderLayout.CENTER);
-
-        card.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        card.addMouseListener(new MouseAdapter() {
+        // Mascot Icon with attached Glowing Oval Pedestal
+        JLabel icon = new JLabel(new ImageIcon(getCardSprite(idx, 60))) {
             @Override
-            public void mouseClicked(MouseEvent e) {
-                playBlip();
-                openManual(d.tabIndex, idx);
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                int cx = getWidth() / 2;
+                int py = getHeight() - 11;
+                g2.setColor(new Color(themeColor.getRed(), themeColor.getGreen(), themeColor.getBlue(), 65));
+                g2.fillOval(cx - 38, py, 76, 15);
+                g2.setColor(new Color(themeColor.getRed(), themeColor.getGreen(), themeColor.getBlue(), 160));
+                g2.setStroke(new BasicStroke(1.1f));
+                g2.drawOval(cx - 38, py, 76, 15);
+                g2.dispose();
+                super.paintComponent(g);
             }
+        };
+        icon.setPreferredSize(new Dimension(80, 60));
+        icon.setAlignmentX(Component.CENTER_ALIGNMENT);
+        center.add(icon);
+        center.add(Box.createVerticalStrut(7));
+
+        // Game Title
+        String rawTitle = d.title;
+        String gameName = rawTitle.contains("//") ? rawTitle.substring(0, rawTitle.indexOf("//")).trim() : rawTitle;
+        JLabel titleL = new JLabel(" " + gameName + " ", SwingConstants.CENTER);
+        titleL.setFont(new Font("Consolas", Font.BOLD, 13));
+        titleL.setBorder(BorderFactory.createEmptyBorder(0, 4, 0, 4));
+        titleL.setForeground(Color.WHITE);
+        titleL.setAlignmentX(Component.CENTER_ALIGNMENT);
+        center.add(titleL);
+        center.add(Box.createVerticalStrut(6));
+
+        // Topic Badge Chip
+        String topicName = rawTitle.contains("//") ? rawTitle.substring(rawTitle.indexOf("//") + 2).trim() : d.category;
+        JLabel topicL = new JLabel("[ " + topicName + " ]", SwingConstants.CENTER) {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(new Color(themeColor.getRed() / 5, themeColor.getGreen() / 5, themeColor.getBlue() / 5, 200));
+                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 6, 6);
+                g2.setColor(new Color(themeColor.getRed(), themeColor.getGreen(), themeColor.getBlue(), 130));
+                g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 6, 6);
+                g2.dispose();
+                super.paintComponent(g);
+            }
+        };
+        topicL.setFont(new Font("Consolas", Font.BOLD, 10));
+        topicL.setForeground(themeColor);
+        topicL.setBorder(BorderFactory.createEmptyBorder(4, 12, 4, 12));
+        topicL.setOpaque(false);
+        topicL.setAlignmentX(Component.CENTER_ALIGNMENT);
+        center.add(topicL);
+        center.add(Box.createVerticalStrut(6));
+
+        // Lore Subtitle
+        JLabel subL = new JLabel(" " + d.subtitle + " ", SwingConstants.CENTER);
+        subL.setFont(new Font("Consolas", Font.PLAIN, 9));
+        subL.setBorder(BorderFactory.createEmptyBorder(0, 2, 0, 2));
+        subL.setForeground(RetroTheme.TEXT_DIM);
+        subL.setAlignmentX(Component.CENTER_ALIGNMENT);
+        center.add(subL);
+
+        centerWrapper.add(center);
+        card.add(centerWrapper, BorderLayout.CENTER);
+
+        // Bottom Action Button: VIEW DOSSIER >>
+        JButton btnDossier = new JButton("VIEW DOSSIER >>") {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(new Color(themeColor.getRed() / 4, themeColor.getGreen() / 4, themeColor.getBlue() / 4));
+                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 6, 6);
+                g2.setColor(themeColor);
+                g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 6, 6);
+                g2.dispose();
+                super.paintComponent(g);
+            }
+        };
+        btnDossier.setFont(new Font("Consolas", Font.BOLD, 11));
+        btnDossier.setForeground(themeColor);
+        btnDossier.setContentAreaFilled(false);
+        btnDossier.setOpaque(false);
+        btnDossier.setFocusPainted(false);
+        btnDossier.setBorder(BorderFactory.createEmptyBorder(8, 14, 8, 14));
+        btnDossier.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        btnDossier.addActionListener(e -> {
+            playBlip();
+            openManual(d.tabIndex, idx);
         });
+        card.add(btnDossier, BorderLayout.SOUTH);
+
         return card;
+    }
+
+    /**
+     * Renders customized, themed procedural retro backgrounds for all 8 arcade games.
+     */
+    private void drawGameThemedBackground(Graphics2D g2, int idx, int w, int h, Color c, boolean hovered) {
+        // Base dark container gradient
+        GradientPaint bgGrad = new GradientPaint(
+                0, 0, new Color(16, 12, 30),
+                0, h, new Color(c.getRed() / 6, c.getGreen() / 6, c.getBlue() / 6)
+        );
+        g2.setPaint(bgGrad);
+        g2.fillRoundRect(0, 0, w, h, 14, 14);
+
+        // Clip to rounded card bounds for all background details
+        Shape oldClip = g2.getClip();
+        g2.clip(new RoundRectangle2D.Float(0, 0, w, h, 14, 14));
+
+        // Procedural Game Background Pattern
+        switch (idx) {
+            case 0: drawInvadersBackground(g2, w, h, c); break;
+            case 1: drawSpaceShootBackground(g2, w, h, c); break;
+            case 2: drawFrameHopperBackground(g2, w, h, c); break;
+            case 3: drawMarioCacheBackground(g2, w, h, c); break;
+            case 4: drawSnakeSegmentationBackground(g2, w, h, c); break;
+            case 5: drawCyberCraneBackground(g2, w, h, c); break;
+            case 6: drawPacmanDiskBackground(g2, w, h, c); break;
+            case 7: drawOvercookedBackground(g2, w, h, c); break;
+        }
+
+        // Dark gradient vignette overlay to guarantee 100% text contrast
+        GradientPaint vignette = new GradientPaint(
+                0, 30, new Color(12, 8, 24, 140),
+                0, h - 30, new Color(12, 8, 24, 190)
+        );
+        g2.setPaint(vignette);
+        g2.fillRect(0, 30, w, h - 30);
+
+        // Restore clip
+        g2.setClip(oldClip);
+
+        // Top Arcade Header Strip
+        g2.setColor(new Color(c.getRed() / 4, c.getGreen() / 4, c.getBlue() / 4, 220));
+        g2.fillRoundRect(2, 2, w - 4, 26, 12, 12);
+        g2.fillRect(2, 16, w - 4, 12);
+
+        // Card Border Glow
+        g2.setColor(hovered ? c : new Color(c.getRed(), c.getGreen(), c.getBlue(), 120));
+        g2.setStroke(new BasicStroke(hovered ? 2.5f : 1.2f));
+        g2.drawRoundRect(0, 0, w - 1, h - 1, 14, 14);
+    }
+
+    private void drawInvadersBackground(Graphics2D g2, int w, int h, Color c) {
+        // Deep space starfield
+        for (int i = 0; i < 40; i++) {
+            int sx = (i * 47 + 13) % w;
+            int sy = (i * 29 + 37) % (h - 50) + 30;
+            int sz = (i % 5 == 0) ? 2 : 1;
+            int alpha = 80 + (i * 17) % 150;
+            g2.setColor(new Color(200, 240, 255, alpha));
+            g2.fillRect(sx, sy, sz, sz);
+        }
+
+        // Horizontal laser radar scanlines
+        g2.setColor(new Color(c.getRed(), c.getGreen(), c.getBlue(), 20));
+        for (int y = 40; y < h - 40; y += 16) {
+            g2.drawLine(10, y, w - 10, y);
+        }
+
+        // Faint descending alien formation silhouettes in background
+        g2.setColor(new Color(c.getRed(), c.getGreen(), c.getBlue(), 35));
+        for (int col = 0; col < 4; col++) {
+            int ax = 28 + col * 64;
+            int ay = 50;
+            g2.fillRect(ax + 4, ay, 12, 4);
+            g2.fillRect(ax, ay + 4, 20, 6);
+            g2.fillRect(ax + 2, ay + 10, 4, 4);
+            g2.fillRect(ax + 14, ay + 10, 4, 4);
+        }
+
+        // Defensive bunker silhouettes at bottom
+        int by = h - 44;
+        g2.setColor(new Color(40, 200, 100, 55));
+        for (int b = 0; b < 3; b++) {
+            int bx = 26 + b * 86;
+            int[] px = { bx + 8, bx + 36, bx + 44, bx + 44, bx + 32, bx + 32, bx + 12, bx + 12, bx };
+            int[] py = { by, by, by + 10, by + 22, by + 22, by + 12, by + 12, by + 22, by + 22 };
+            g2.fillPolygon(px, py, px.length);
+        }
+    }
+
+    private void drawSpaceShootBackground(Graphics2D g2, int w, int h, Color c) {
+        // Starfield & nebula dust
+        for (int i = 0; i < 35; i++) {
+            int sx = (i * 53 + 7) % w;
+            int sy = (i * 31 + 41) % (h - 40) + 30;
+            g2.setColor(new Color(255, 220, 140, 60 + (i * 23) % 120));
+            g2.fillRect(sx, sy, (i % 6 == 0) ? 2 : 1, (i % 6 == 0) ? 2 : 1);
+        }
+
+        // Cyber Vault Hexagonal grid / vector nodes
+        g2.setColor(new Color(c.getRed(), c.getGreen(), c.getBlue(), 28));
+        g2.setStroke(new BasicStroke(1.0f));
+        int cx = w / 2;
+        int cy = h / 2 - 10;
+        g2.drawOval(cx - 70, cy - 70, 140, 140);
+        g2.drawOval(cx - 40, cy - 40, 80, 80);
+        g2.drawLine(cx - 85, cy, cx + 85, cy);
+        g2.drawLine(cx, cy - 85, cx, cy + 85);
+
+        // Banker's Safety Vector Matrix Nodes
+        g2.setColor(new Color(c.getRed(), c.getGreen(), c.getBlue(), 45));
+        String[] nodes = {"[R1]", "[R2]", "[R3]"};
+        g2.setFont(new Font("Consolas", Font.BOLD, 9));
+        for (int i = 0; i < 3; i++) {
+            int nx = 20 + i * 90;
+            int ny = h - 46;
+            g2.drawRoundRect(nx, ny, 32, 16, 4, 4);
+            g2.drawString(nodes[i], nx + 5, ny + 12);
+            if (i < 2) {
+                g2.drawLine(nx + 32, ny + 8, nx + 58, ny + 8);
+            }
+        }
+    }
+
+    private void drawFrameHopperBackground(Graphics2D g2, int w, int h, Color c) {
+        // Frogger River & Highway crossing lanes
+        // 1. River section (Upper middle)
+        g2.setColor(new Color(15, 65, 110, 70));
+        g2.fillRect(10, 48, w - 20, 42);
+        // Floating logs
+        g2.setColor(new Color(130, 85, 45, 80));
+        g2.fillRoundRect(24, 52, 52, 12, 6, 6);
+        g2.fillRoundRect(120, 52, 65, 12, 6, 6);
+        g2.fillRoundRect(70, 70, 70, 12, 6, 6);
+        // Water ripples
+        g2.setColor(new Color(40, 255, 200, 60));
+        g2.drawLine(30, 66, 60, 66);
+        g2.drawLine(150, 66, 190, 66);
+
+        // 2. Highway section (Lower middle)
+        g2.setColor(new Color(25, 25, 38, 90));
+        g2.fillRect(10, 96, w - 20, 44);
+        // Dashed road center divider
+        g2.setColor(new Color(255, 220, 50, 70));
+        g2.setStroke(new BasicStroke(1.5f));
+        for (int x = 20; x < w - 20; x += 28) {
+            g2.drawLine(x, 118, x + 16, 118);
+        }
+
+        // 3. MMU Paging Address Bus tracks at bottom
+        g2.setColor(new Color(c.getRed(), c.getGreen(), c.getBlue(), 45));
+        g2.setFont(new Font("Consolas", Font.BOLD, 8));
+        for (int f = 0; f < 4; f++) {
+            int fx = 18 + f * 64;
+            int fy = h - 44;
+            g2.drawRoundRect(fx, fy, 48, 16, 4, 4);
+            g2.drawString("FRAME " + f, fx + 6, fy + 12);
+        }
+    }
+
+    private void drawMarioCacheBackground(Graphics2D g2, int w, int h, Color c) {
+        // Subterranean Mario 8-bit brick wall pattern
+        int brickW = 28;
+        int brickH = 14;
+        g2.setColor(new Color(160, 65, 45, 50));
+        for (int row = 0; row < 7; row++) {
+            int y = 40 + row * brickH;
+            int offset = (row % 2 == 0) ? 0 : brickW / 2;
+            for (int col = -1; col < (w / brickW) + 2; col++) {
+                int x = col * brickW + offset;
+                g2.drawRect(x, y, brickW, brickH);
+            }
+        }
+
+        // Floating Question Mark Coin Block [ ? ] in upper right
+        int qx = w - 50;
+        int qy = 44;
+        g2.setColor(new Color(240, 180, 40, 85));
+        g2.fillRoundRect(qx, qy, 24, 24, 6, 6);
+        g2.setColor(new Color(255, 230, 80));
+        g2.drawRoundRect(qx, qy, 24, 24, 6, 6);
+        g2.setFont(new Font("Consolas", Font.BOLD, 14));
+        g2.drawString("?", qx + 7, qy + 17);
+
+        // Classic Green Warp Pipe rising from bottom corner
+        int px = 18;
+        int py = h - 50;
+        g2.setColor(new Color(35, 175, 65, 90));
+        g2.fillRect(px + 4, py + 10, 36, 36); // Stem
+        g2.fillRect(px, py, 44, 10);          // Lip
+        g2.setColor(new Color(75, 240, 120, 110));
+        g2.drawRect(px + 4, py + 10, 36, 36);
+        g2.drawRect(px, py, 44, 10);
+    }
+
+    private void drawSnakeSegmentationBackground(Graphics2D g2, int w, int h, Color c) {
+        // Digital cyber grid
+        g2.setColor(new Color(c.getRed(), c.getGreen(), c.getBlue(), 20));
+        g2.setStroke(new BasicStroke(1.0f));
+        for (int x = 12; x < w - 12; x += 16) {
+            g2.drawLine(x, 34, x, h - 34);
+        }
+        for (int y = 34; y < h - 34; y += 16) {
+            g2.drawLine(12, y, w - 12, y);
+        }
+
+        // Serpentine segmented body trail
+        int[][] snakeBody = {
+            {35, 56}, {53, 56}, {71, 56}, {89, 56},
+            {89, 74}, {89, 92}, {107, 92}, {125, 92},
+            {143, 92}, {161, 92}, {161, 110}, {179, 110}
+        };
+        g2.setColor(new Color(90, 245, 140, 50));
+        for (int i = 0; i < snakeBody.length; i++) {
+            g2.fillRoundRect(snakeBody[i][0], snakeBody[i][1], 12, 12, 4, 4);
+        }
+        // Glowing food pellet / segment base
+        g2.setColor(new Color(255, 75, 75, 85));
+        g2.fillOval(202, 110, 10, 10);
+
+        // Memory segment boundary trap line at bottom
+        int by = h - 44;
+        g2.setColor(new Color(255, 60, 60, 65));
+        g2.drawLine(20, by, w - 20, by);
+        g2.setFont(new Font("Consolas", Font.BOLD, 8));
+        g2.drawString("LIMIT BARRIER // HARDWARE TRAP", 26, by + 12);
+    }
+
+    private void drawCyberCraneBackground(Graphics2D g2, int w, int h, Color c) {
+        // Industrial overhead gantry crane girder truss across top
+        int gy = 40;
+        g2.setColor(new Color(c.getRed(), c.getGreen(), c.getBlue(), 40));
+        g2.setStroke(new BasicStroke(1.2f));
+        g2.drawRect(16, gy, w - 32, 14);
+        for (int x = 16; x < w - 32; x += 20) {
+            g2.drawLine(x, gy, x + 20, gy + 14);
+            g2.drawLine(x + 20, gy, x, gy + 14);
+        }
+
+        // Steel cable hanging down
+        g2.setColor(new Color(200, 180, 240, 55));
+        g2.drawLine(w / 2, gy + 14, w / 2, gy + 38);
+
+        // Contiguous RAM Partition Slots at bottom
+        int ry = h - 46;
+        int rw = (w - 36) / 3;
+        String[] slots = {"[128K HOLE]", "[256K ALLOC]", "[64K HOLE]"};
+        g2.setFont(new Font("Consolas", Font.BOLD, 8));
+        for (int i = 0; i < 3; i++) {
+            int rx = 18 + i * (rw + 4);
+            boolean isAlloc = (i == 1);
+            g2.setColor(isAlloc ? new Color(c.getRed(), c.getGreen(), c.getBlue(), 50) : new Color(30, 22, 45, 75));
+            g2.fillRoundRect(rx, ry, rw, 18, 4, 4);
+            g2.setColor(new Color(c.getRed(), c.getGreen(), c.getBlue(), 75));
+            g2.drawRoundRect(rx, ry, rw, 18, 4, 4);
+            g2.setColor(isAlloc ? Color.WHITE : RetroTheme.TEXT_DIM);
+            g2.drawString(slots[i], rx + 4, ry + 12);
+        }
+    }
+
+    private void drawPacmanDiskBackground(Graphics2D g2, int w, int h, Color c) {
+        // Concentric magnetic platter cylinder tracks
+        int cx = w / 2;
+        int cy = h / 2 - 10;
+        g2.setColor(new Color(c.getRed(), c.getGreen(), c.getBlue(), 25));
+        g2.setStroke(new BasicStroke(1.0f));
+        g2.drawOval(cx - 70, cy - 70, 140, 140);
+        g2.drawOval(cx - 50, cy - 50, 100, 100);
+        g2.drawOval(cx - 30, cy - 30, 60, 60);
+
+        // Disk Head Actuator Arm Radial Vector
+        g2.setColor(new Color(255, 120, 40, 75));
+        g2.setStroke(new BasicStroke(1.8f));
+        g2.drawLine(cx, cy, cx + 60, cy - 30);
+        g2.fillOval(cx + 57, cy - 33, 6, 6);
+
+        // Retro Arcade Maze Neon Blue Border & Dots
+        g2.setColor(new Color(35, 95, 255, 65));
+        g2.setStroke(new BasicStroke(1.5f));
+        g2.drawRoundRect(16, 40, w - 32, h - 84, 8, 8);
+
+        // Glowing Pac-Dots along maze trail
+        g2.setColor(new Color(255, 235, 140, 85));
+        for (int x = 28; x < w - 28; x += 20) {
+            g2.fillOval(x, 46, 3, 3);
+            g2.fillOval(x, h - 48, 3, 3);
+        }
+        g2.fillOval(w - 32, 45, 6, 6);
+    }
+
+    private void drawOvercookedBackground(Graphics2D g2, int w, int h, Color c) {
+        // Isometric diamond checkerboard kitchen tile floor
+        int tileSize = 20;
+        for (int row = 1; row < 9; row++) {
+            int y = 36 + row * 15;
+            for (int col = 0; col < (w / tileSize) + 1; col++) {
+                int x = col * tileSize + ((row % 2 == 0) ? 0 : tileSize / 2);
+                boolean dark = ((row + col) % 2 == 0);
+                g2.setColor(dark ? new Color(45, 22, 18, 55) : new Color(85, 38, 24, 35));
+                int[] px = { x, x + tileSize / 2, x, x - tileSize / 2 };
+                int[] py = { y - 7, y, y + 7, y };
+                g2.fillPolygon(px, py, 4);
+            }
+        }
+
+        // Order Ticket Rail across top (Hanging order tickets)
+        int ty = 40;
+        g2.setColor(new Color(180, 170, 160, 55));
+        g2.fillRect(18, ty, w - 36, 4);
+        for (int t = 0; t < 4; t++) {
+            int tx = 26 + t * 58;
+            g2.setColor(new Color(250, 245, 220, 75));
+            g2.fillRect(tx, ty + 4, 32, 16);
+            g2.setColor(new Color(190, 80, 40, 85));
+            g2.setFont(new Font("Consolas", Font.BOLD, 8));
+            g2.drawString("#0" + (t + 1), tx + 5, ty + 15);
+        }
+
+        // Stove burner heating rings at bottom
+        int sy = h - 42;
+        g2.setColor(new Color(255, 100, 30, 60));
+        g2.setStroke(new BasicStroke(1.5f));
+        g2.drawOval(w / 2 - 32, sy - 8, 28, 14);
+        g2.drawOval(w / 2 + 4, sy - 8, 28, 14);
     }
 
     private Image getCardSprite(int idx, int sz) {

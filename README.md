@@ -57,23 +57,49 @@ java -cp "bin" arcadeos.ArcadeOS
 
 | Mission | OS Module | Algorithms / Policies Implemented | Key Visuals & Telemetry | Corresponding Java Class |
 |:---:|:---|:---|:---|:---|
-| **01** | **CPU Scheduling** | FCFS, SJF (Non-preemptive), SRTF (Preemptive), Priority (Preemptive & Non-preemptive), Round Robin (Configurable Quantum $q$) | Live Timeline Gantt Chart, Waiting Time ($\bar{WT}$), Turnaround Time ($\bar{TAT}$), Ready Queue | `CPUSchedulingPanel.java`<br>`CPUComparisonDialog.java`<br>`KernelTapperDialog.java` |
-| **02** | **Banker's Algorithm** | Dijkstra's Safety Algorithm, Multi-Resource Need Matrix calculation ($Need = Max - Alloc$), Safe Sequence Finder, Resource-Request What-If Analysis | Allocation/Max/Need Matrices, Available Vector, Safety Auditor, Space Shoot Arcade | `BankersPanel.java`<br>`VaultPanicDialog.java` |
-| **03** | **Paging** | Logical-to-Physical Address Translation, Page-to-Frame Mapping, Page Table lookup, Variable Page & Frame Size calculation | Real-Time Address Splitter ($p = addr / size$, $d = addr \pmod{size}$), Physical Bus Hopper Canvas | `PagingPanel.java`<br>`PagingHopperCanvas.java`<br>`FrameHopperDialog.java` |
-| **04** | **Page Replacement** | FIFO (First-In First-Out), LRU (Least Recently Used), Optimal (Belady's Min) | Frame State Grid, Page Hit / Fault counter, Hit Rate Ratio ($Hit\%$), Mario Cache Arena | `PageReplacementPanel.java`<br>`MarioCacheRunnerDialog.java` |
-| **05** | **Segmentation** | Segment Table validation, Base & Limit Register mapping, Hardware Trap / Boundary Fault detection | Segment Limit Trap Detector, Heap/Stack Visual Arena, Variable Segment Editor, Heap vs Stack Snake Arena | `SegmentationPanel.java`<br>`game.snake.SnakeGameDialog.java`<br>`SegmentSnakeArenaCanvas.java` |
-| **06** | **RAM Allocation & Fragmentation** | First-Fit, Best-Fit, Next-Fit, Contiguous Partitioning, Memory Compaction | Silicon RAM Motherboard Map, Internal Heat Frag, External Frag Gauges, Cyber Crane Attack Arena | `FragmentationPanel.java`<br>`DefragPanicDialog.java` |
-| **07** | **Disk Scheduling** | FCFS, SSTF, SCAN, C-SCAN, LOOK, C-LOOK | Cylindrical Track Platter, Step-by-Step Traversal Order, Total Head Movement (Cylinders), Pac-Man Disk Arena | `DiskSchedulingPanel.java`<br>`PacmanDiskArcadeDialog.java` |
-| **08** | **Multiprogramming** | Degree of Multiprogramming ($N$), Concurrent CPU Scheduling, CPU Utilization Curve ($1 - p^N$), Context Switching Overhead | Concurrency Kitchen Dashboard, CPU Load vs. I/O Wait Ratio, Memory Footprint Gauges | `MultiprogrammingPanel.java`<br>`OvercookedKitchenDialog.java` |
+| **01** | **CPU Scheduling** (6 pts) | FCFS, SJF (Non-preemptive), SRTF (Preemptive SJF), Priority (Preemptive & Non-preemptive), Round Robin (Configurable Quantum $q$) | Live Timeline Gantt Chart, Per-Process & Average Waiting Time ($\bar{WT}$), Turnaround Time ($\bar{TAT}$), Ready Queue | `CPUSchedulingPanel.java`<br>`CPUComparisonDialog.java`<br>`KernelTapperDialog.java` |
+| **02** | **Banker's Algorithm** (5 pts) | Dijkstra's Safety Algorithm, Multi-Resource Need Matrix ($Need = Max - Alloc$), Safe Sequence Finder, What-If Resource-Request Analysis | Dynamic Process Count & Resource Count, Allocation/Max/Need Matrices, Available Vector, Safety Auditor | `BankersPanel.java`<br>`VaultPanicDialog.java` |
+| **03** | **Paging** (4 pts) | Logical-to-Physical Address Translation, Page-to-Frame Mapping Table, Page Table lookup, Variable Page & Frame Size | Real-Time Address Splitter ($p = addr / size$, $d = addr \pmod{size}$), Physical RAM Stack, Page Fault Handling | `PagingPanel.java`<br>`PagingHopperCanvas.java`<br>`FrameHopperDialog.java` |
+| **04** | **Page Replacement** (6 pts) | FIFO (First-In First-Out), LRU (Least Recently Used), Optimal (Belady's Min) | Unlimited Pipes with Auto-Centering & Smooth Scrolling, Step-by-Step Frame Matrix, Page Hits & Faults Counters | `PageReplacementPanel.java`<br>`MarioCacheRunnerDialog.java` |
+| **05** | **Segmentation** (4 pts) | Segment Table (Base & Limit registers), Hardware Limit Trap Validation ($offset \ge limit$) | Out-of-Range SIGSEGV Fault Detector, Heap/Stack Visual Arena, Variable Segment Editor, Snake Arena | `SegmentationPanel.java`<br>`game.snake.SnakeGameDialog.java`<br>`SegmentSnakeArenaCanvas.java` |
+| **06** | **RAM Allocation & Fragmentation** (4 pts) | First-Fit, Best-Fit, Next-Fit, Contiguous Partitioning, Memory Compaction | Multiple Memory Blocks & Processes, Internal Heat Frag, External Frag Alert Bridge, Defragmentation Tool | `FragmentationPanel.java`<br>`DefragPanicDialog.java` |
+| **07** | **Disk Scheduling** (6 pts) | FCFS, SSTF, SCAN, C-SCAN (Circular with Warp Tunnel), LOOK, C-LOOK | Cylindrical Platter & Sector Track, Step-by-Step Service Order, Total Head Movement & Avg Seek HUD | `DiskSchedulingPanel.java`<br>`PacmanDiskArcadeDialog.java` |
+| **08** | **Multiprogramming** (5 pts) | Degree of Multiprogramming ($N$), Processor Sharing Model ($\%CPU/n_j = 1/n_j$), Kitchen Concurrency | Active Concurrency ($n_j$), CPU Share %, 100% CPU & RAM Utilization Display, Interval Execution Matrix | `MultiprogrammingPanel.java`<br>`OvercookedKitchenDialog.java` |
 
 ---
 
 ## 📊 Compliance with Rubric Criteria
 
 ### A. Program Development & Implementation (40 Points)
-- **100% Complete Implementation:** All 8 required modules are fully functional, interactive, and mathematically verified.
-- **Safe State Sequence:** Guaranteed safe sequence generation under Banker's algorithm; detects unsafe states and deadlocks accurately.
-- **Fault Traps:** Hardware limit traps trigger immediately on illegal logical addresses in Segmentation ($d \ge Limit$).
+1. **CPU Scheduling (6 pts):**
+   - Implements FCFS, SJF (preemptive SRTF & non-preemptive), Priority, and Round Robin (with dynamic time quantum).
+   - Generates interactive visual Gantt charts with exact execution order.
+   - Computes Arrival, Burst, Completion, Waiting Time ($WT$), and Turnaround Time ($TAT$) per process, plus system Average Waiting Time and Average Turnaround Time.
+2. **Banker's Algorithm (5 pts):**
+   - Supports user-configured process count (dynamic add/remove rows) and multi-resource counts (A, B, C tokens).
+   - Automatically computes textbook Need Matrix ($Need = Max - Alloc$).
+   - Accurately reports Safe vs. Unsafe state and outputs the exact Safe Sequence (e.g. `< P1 ➔ P3 ➔ P4 ➔ P0 ➔ P2 >`) or deadlock detection.
+3. **Paging (4 pts):**
+   - Implements page-to-frame mapping table with valid/unmapped status indicators.
+   - Computes complete logical to physical address translation with page size decomposition and physical RAM stack highlighting.
+4. **Page Replacement (6 pts):**
+   - Implements FIFO, LRU, and Optimal algorithms.
+   - Displays step-by-step frame changes across Mario Warp Pipes with horizontal memory trace matrix.
+   - Real-time tracking of Page Hits (with hit ratio and coin beams) and Page Faults (with penalty disk swaps and eviction lasers).
+   - Auto-centering for low pipe counts (2, 3, 4) and unlimited horizontal scrolling for large frame allocations.
+5. **Segmentation (4 pts):**
+   - Segment table with `#`, Segment Name, Base, Limit, and End address registers.
+   - Hardware trap validation: if $offset \ge limit$, halts address calculation and displays an explicit **LIMIT TRAP: SEGMENTATION FAULT (SIGSEGV)** warning.
+6. **Memory Allocation & Fragmentation (4 pts):**
+   - Configurable multiple memory blocks/sockets and multiple process chips.
+   - Shows First-Fit, Best-Fit, and Next-Fit allocation distributions.
+   - Distinctly calculates and visualizes **Internal Fragmentation** (leftover partition space) and **External Fragmentation** (insufficient contiguous space despite adequate total free memory) with dynamic defragmentation.
+7. **Disk Scheduling (6 pts):**
+   - Implements all 6 classic algorithms: FCFS, SSTF, SCAN, C-SCAN, LOOK, and C-LOOK.
+   - Displays complete service traversal order and cumulative Total Head Movement (cylinders) with average seek metrics.
+8. **Multiprogramming (5 pts):**
+   - Simulates multiple concurrent processes sharing CPU and resources via the processor sharing model ($\%CPU/n_j = 1/n_j$).
+   - Live system status display with real-time active concurrency ($n_j$), CPU share, and CPU/RAM utilization metrics.
 
 ### B. GUI Design & Usability (10 Points)
 - **Consistent Arcade Theme:** Unified retro CRT scanlines, 3D tactile arcade buttons, custom pixel sprites, and crisp Consolas typography.

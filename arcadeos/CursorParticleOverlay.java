@@ -16,6 +16,7 @@ import javax.swing.*;
  * - {@code contains(x, y)} returns false so ALL mouse clicks pass through 100%.
  * - Uses global AWTEventListener to passively track cursor movement and clicks.
  * - Auto-pauses animation when no particles are active (zero idle CPU).
+ * - Uses dirty-region repainting so underlying cards & tables stay 100% rock-solid.
  */
 public class CursorParticleOverlay extends JComponent {
 
@@ -42,7 +43,7 @@ public class CursorParticleOverlay extends JComponent {
     }
 
     private final List<SparkParticle> particles = new ArrayList<>();
-    private final Timer animTimer;
+    private Timer animTimer;
     private final java.util.Random rng = new java.util.Random();
 
     // Vibrant Synthwave / 8-Bit Arcade Stardust Palette
@@ -57,32 +58,86 @@ public class CursorParticleOverlay extends JComponent {
 
     private int lastX = -999;
     private int lastY = -999;
+    private Rectangle lastDirtyRect = null;
 
     public CursorParticleOverlay() {
         setOpaque(false);
 
-        // 60 FPS animation loop
+        // 60 FPS animation loop with dirty-region repainting
         animTimer = new Timer(16, e -> {
+            Rectangle dirty = null;
             synchronized (particles) {
                 if (particles.isEmpty()) {
+                    animTimer.stop();
+                    if (lastDirtyRect != null) {
+                        repaint(lastDirtyRect);
+                        lastDirtyRect = null;
+                    }
                     return;
                 }
+
+                int minX = Integer.MAX_VALUE, minY = Integer.MAX_VALUE;
+                int maxX = Integer.MIN_VALUE, maxY = Integer.MIN_VALUE;
+
                 for (int i = particles.size() - 1; i >= 0; i--) {
                     SparkParticle p = particles.get(i);
                     p.x += p.vx;
                     p.y += p.vy;
                     // Gentle upward stardust float + slight air resistance
-                    p.vy -= 0.025f;
-                    p.vx *= 0.96f;
+                    p.vy -= 0.035f;
+                    p.vx *= 0.95f;
                     p.life -= p.decay;
+
                     if (p.life <= 0.0f) {
                         particles.remove(i);
+                    } else {
+                        int px = (int) p.x;
+                        int py = (int) p.y;
+                        int sz = (int) p.size + 6;
+                        if (px - sz < minX) minX = px - sz;
+                        if (py - sz < minY) minY = py - sz;
+                        if (px + sz > maxX) maxX = px + sz;
+                        if (py + sz > maxY) maxY = py + sz;
                     }
                 }
+
+                if (minX <= maxX && minY <= maxY) {
+                    dirty = new Rectangle(minX - 4, minY - 4, (maxX - minX) + 8, (maxY - minY) + 8);
+                }
             }
-            repaint();
+
+            // Union with last dirty rect to cleanly erase disappearing particles
+            Rectangle toRepaint = dirty;
+            if (lastDirtyRect != null) {
+                if (toRepaint != null) {
+                    toRepaint = toRepaint.union(lastDirtyRect);
+                } else {
+                    toRepaint = lastDirtyRect;
+                }
+            }
+            lastDirtyRect = dirty;
+
+            if (toRepaint != null) {
+                repaint(toRepaint);
+            }
         });
-        animTimer.start();
+
+        // Global AWT Event Listener to passively capture mouse movement across any card or component
+        try {
+            Toolkit.getDefaultToolkit().addAWTEventListener(event -> {
+                if (event instanceof MouseEvent me) {
+                    if (!isShowing()) return;
+                    Point p = me.getLocationOnScreen();
+                    SwingUtilities.convertPointFromScreen(p, CursorParticleOverlay.this);
+                    int id = me.getID();
+                    if (id == MouseEvent.MOUSE_MOVED || id == MouseEvent.MOUSE_DRAGGED) {
+                        onMouseMove(p.x, p.y);
+                    } else if (id == MouseEvent.MOUSE_PRESSED) {
+                        onMouseClick(p.x, p.y);
+                    }
+                }
+            }, AWTEvent.MOUSE_MOTION_EVENT_MASK | AWTEvent.MOUSE_EVENT_MASK);
+        } catch (SecurityException ignored) {}
     }
 
     /**
@@ -105,21 +160,21 @@ public class CursorParticleOverlay extends JComponent {
         double dist = Math.hypot(x - lastX, y - lastY);
         // Only spawn when mouse is actually moving
         if (dist >= 3.0) {
-            int count = Math.min(4, Math.max(1, (int)(dist / 7.0)));
+            int count = Math.min(4, Math.max(1, (int)(dist / 6.0)));
             synchronized (particles) {
-                if (particles.size() < 120) {
+                if (particles.size() < 100) {
                     for (int i = 0; i < count; i++) {
                         float interp = (float)i / count;
                         float px = lastX + (x - lastX) * interp;
                         float py = lastY + (y - lastY) * interp;
 
                         float angle = (float)(rng.nextDouble() * Math.PI * 2);
-                        float speed = (float)(0.4 + rng.nextDouble() * 1.6);
+                        float speed = (float)(0.4 + rng.nextDouble() * 1.5);
                         float vx = (float)(Math.cos(angle) * speed);
-                        float vy = (float)(Math.sin(angle) * speed - 0.35); // drift up
+                        float vy = (float)(Math.sin(angle) * speed - 0.4); // upward drift
 
-                        float size = 2.5f + rng.nextFloat() * 2.8f;
-                        float decay = 0.028f + rng.nextFloat() * 0.032f; // ~400-600ms lifespan
+                        float size = 2.5f + rng.nextFloat() * 2.5f;
+                        float decay = 0.030f + rng.nextFloat() * 0.035f; // ~400ms lifespan
                         Color col = PALETTE[rng.nextInt(PALETTE.length)];
                         int shape = rng.nextInt(3);
 
@@ -129,6 +184,10 @@ public class CursorParticleOverlay extends JComponent {
             }
             lastX = x;
             lastY = y;
+
+            if (!animTimer.isRunning()) {
+                animTimer.start();
+            }
         }
     }
 
@@ -138,7 +197,7 @@ public class CursorParticleOverlay extends JComponent {
             int burstCount = 10;
             for (int i = 0; i < burstCount; i++) {
                 double angle = (Math.PI * 2 * i / burstCount) + (rng.nextDouble() * 0.4 - 0.2);
-                float speed = (float)(1.5 + rng.nextDouble() * 2.4);
+                float speed = (float)(1.5 + rng.nextDouble() * 2.2);
                 float vx = (float)(Math.cos(angle) * speed);
                 float vy = (float)(Math.sin(angle) * speed);
 
@@ -149,6 +208,9 @@ public class CursorParticleOverlay extends JComponent {
 
                 particles.add(new SparkParticle(x, y, vx, vy, size, decay, col, shape));
             }
+        }
+        if (!animTimer.isRunning()) {
+            animTimer.start();
         }
     }
 

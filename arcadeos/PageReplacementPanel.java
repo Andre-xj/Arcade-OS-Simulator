@@ -249,7 +249,27 @@ public class PageReplacementPanel extends JPanel {
         lblPipeCount.setOpaque(true);
         lblPipeCount.setBackground(new Color(15, 10, 28));
         lblPipeCount.setBorder(BorderFactory.createLineBorder(new Color(255, 220, 0), 1));
-        lblPipeCount.setPreferredSize(new Dimension(38, 26));
+        lblPipeCount.setPreferredSize(new Dimension(48, 26));
+        lblPipeCount.setToolTipText("Click to enter custom pipe count, or click + / -");
+        lblPipeCount.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        lblPipeCount.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                String input = JOptionPane.showInputDialog(PageReplacementPanel.this,
+                        "ENTER PIPE COUNT (UNLIMITED CAPACITY):",
+                        String.valueOf(frameCount));
+                if (input != null && !input.trim().isEmpty()) {
+                    try {
+                        int val = Integer.parseInt(input.trim());
+                        if (val >= 1) {
+                            frameCount = val;
+                            lblPipeCount.setText(String.valueOf(frameCount));
+                            recomputeSimulation();
+                        }
+                    } catch (NumberFormatException ignored) {}
+                }
+            }
+        });
 
         JButton btnInc = createStepperBtn("+");
 
@@ -262,11 +282,9 @@ public class PageReplacementPanel extends JPanel {
         });
 
         btnInc.addActionListener(e -> {
-            if (frameCount < 16) { // Supports up to 16 pipes seamlessly!
-                frameCount++;
-                lblPipeCount.setText(String.valueOf(frameCount));
-                recomputeSimulation();
-            }
+            frameCount++;
+            lblPipeCount.setText(String.valueOf(frameCount));
+            recomputeSimulation();
         });
 
         stepper.add(btnDec);
@@ -893,7 +911,23 @@ public class PageReplacementPanel extends JPanel {
     }
 
     public void setFrameCount(int f) {
-        this.frameCount = Math.max(1, Math.min(16, f));
+        this.frameCount = Math.max(1, f);
+        if (lblPipeCount != null) {
+            lblPipeCount.setText(String.valueOf(frameCount));
+        }
+        recomputeSimulation();
+    }
+
+    public int getFrameCount() {
+        return frameCount;
+    }
+
+    public DefaultTableModel getTraceTableModel() {
+        return traceModel;
+    }
+
+    public void incrementPipesForTest() {
+        frameCount++;
         if (lblPipeCount != null) {
             lblPipeCount.setText(String.valueOf(frameCount));
         }
@@ -1448,9 +1482,15 @@ public class PageReplacementPanel extends JPanel {
         private String challengeType = ""; // "HIT", "EVICT", "ALLOCATE"
         private int challengeTargetIdx = -1;
 
-        // Smooth gliding scroll state
+        // Smooth gliding scroll state for top conveyor belt
         private float smoothScrollOffset = 0f;
         private float targetScrollOffset = 0f;
+
+        // Smooth horizontal pipe scrolling for unlimited / infinite pipes
+        private float pipeScrollX = 0f;
+        private float targetPipeScrollX = 0f;
+        private int dragStartX = -1;
+        private float dragStartScroll = 0f;
 
         private final BufferedImage marioSprite;
         private final List<Rectangle> frameSlotBounds = new ArrayList<>();
@@ -1462,8 +1502,24 @@ public class PageReplacementPanel extends JPanel {
             setBorder(BorderFactory.createLineBorder(new Color(65, 45, 95), 1));
             marioSprite = PixelSprites.createMarioSprite(44);
 
-            // Mouse Click & Hover for Challenge Mode
+            // Mouse Wheel scrolling over pipe bay
+            addMouseWheelListener(e -> {
+                int notches = e.getWheelRotation();
+                targetPipeScrollX = Math.max(0, targetPipeScrollX + notches * 65);
+                repaint();
+            });
+
+            // Mouse Click & Hover for Challenge Mode and Drag-to-scroll
             addMouseListener(new MouseAdapter() {
+                @Override
+                public void mousePressed(MouseEvent e) {
+                    dragStartX = e.getX();
+                    dragStartScroll = targetPipeScrollX;
+                }
+                @Override
+                public void mouseReleased(MouseEvent e) {
+                    dragStartX = -1;
+                }
                 @Override
                 public void mouseClicked(MouseEvent e) {
                     if (!challengeMode || !parent.isAwaitingEvictionChoice()) return;
@@ -1477,6 +1533,14 @@ public class PageReplacementPanel extends JPanel {
             });
 
             addMouseMotionListener(new MouseMotionAdapter() {
+                @Override
+                public void mouseDragged(MouseEvent e) {
+                    if (dragStartX != -1) {
+                        float delta = dragStartX - e.getX();
+                        targetPipeScrollX = Math.max(0, dragStartScroll + delta);
+                        repaint();
+                    }
+                }
                 @Override
                 public void mouseMoved(MouseEvent e) {
                     if (!challengeMode || !parent.isAwaitingEvictionChoice()) {
@@ -1516,6 +1580,15 @@ public class PageReplacementPanel extends JPanel {
                 } else {
                     smoothScrollOffset = targetScrollOffset;
                 }
+
+                // Pipe Bay smooth scroll lerp
+                float pDiff = targetPipeScrollX - pipeScrollX;
+                if (Math.abs(pDiff) > 0.25f) {
+                    pipeScrollX += pDiff * 0.25f;
+                } else {
+                    pipeScrollX = targetPipeScrollX;
+                }
+
                 repaint();
             }).start();
         }
@@ -1638,6 +1711,19 @@ public class PageReplacementPanel extends JPanel {
             int capsuleW = 40;
             int gap = 8;
             this.targetScrollOffset = (step >= 0) ? (step * (capsuleW + gap)) : 0f;
+
+            // Auto-center active pipe in visible viewport
+            int activePipe = (hitIdx != -1) ? hitIdx : ((victimIdx != -1) ? victimIdx : -1);
+            if (activePipe != -1 && frames != null && frames.length > 8) {
+                int slotW = 72;
+                int slotGap = 8;
+                int pipeX = activePipe * (slotW + slotGap);
+                int availW = Math.max(200, getWidth() - 360);
+                int totalPipesW = frames.length * slotW + (frames.length - 1) * slotGap;
+                int maxScroll = Math.max(0, totalPipesW - availW);
+                this.targetPipeScrollX = Math.max(0, Math.min(maxScroll, pipeX - (availW - slotW) / 2));
+            }
+
             repaint();
         }
 
@@ -1845,17 +1931,36 @@ public class PageReplacementPanel extends JPanel {
             int numF = frames.length;
             int startSlotX = marioX + marioW + 16;
             int endSlotX = swapX - 16;
-            int availW = endSlotX - startSlotX;
-            int slotGap = (numF <= 4) ? 16 : ((numF <= 6) ? 12 : ((numF <= 9) ? 8 : 4));
+            int availW = Math.max(100, endSlotX - startSlotX);
 
-            int slotW = 120;
-            if (numF > 0) {
-                slotW = Math.max(30, (availW - (numF - 1) * slotGap) / numF);
+            int slotGap;
+            int slotW;
+            if (numF <= 4) {
+                slotGap = 16;
+                slotW = Math.min(130, (availW - (numF - 1) * slotGap) / Math.max(1, numF));
+            } else if (numF <= 6) {
+                slotGap = 12;
+                slotW = Math.min(105, (availW - (numF - 1) * slotGap) / numF);
+            } else if (numF <= 8) {
+                slotGap = 8;
+                slotW = Math.min(85, (availW - (numF - 1) * slotGap) / numF);
+            } else {
+                // Unlimited / Infinite Pipes: Maintain crisp 72px 3D pipe cylinder with full details!
+                slotGap = 8;
+                slotW = 72;
             }
+
+            int totalPipesW = numF * slotW + Math.max(0, numF - 1) * slotGap;
+            int maxScroll = Math.max(0, totalPipesW - availW);
+            if (targetPipeScrollX > maxScroll) targetPipeScrollX = maxScroll;
+            if (targetPipeScrollX < 0) targetPipeScrollX = 0;
+
+            // Center pipes when total width is less than available bay width (e.g. 2, 3, 4 pipes)
+            int centerOffset = (totalPipesW < availW) ? (availW - totalPipesW) / 2 : 0;
+
             int slotH = podH;
             int slotY = podY;
 
-            int sx = startSlotX;
             int hitLineX = -1;
             int hitLineY = -1;
             int hitSlotW = 0;
@@ -1863,7 +1968,12 @@ public class PageReplacementPanel extends JPanel {
             int victimLineY = -1;
             int victimSlotW = 0;
 
+            // Clip pipe drawing cleanly between Mario and the Disk Swap Bay
+            Shape prevClip = g2.getClip();
+            g2.clipRect(startSlotX, 0, availW, h);
+
             for (int f = 0; f < numF; f++) {
+                int sx = startSlotX + centerOffset + f * (slotW + slotGap) - (int) pipeScrollX;
                 Rectangle sBounds = new Rectangle(sx, slotY, slotW, slotH);
                 frameSlotBounds.add(sBounds);
 
@@ -1883,6 +1993,11 @@ public class PageReplacementPanel extends JPanel {
                     victimLineX = sx + slotW / 2;
                     victimLineY = slotY + 28;
                     victimSlotW = slotW;
+                }
+
+                // Skip drawing pipes that are completely scrolled out of view to maintain 60 FPS performance!
+                if (sx + slotW < startSlotX - 20 || sx > startSlotX + availW + 20) {
+                    continue;
                 }
 
                 // =============================================================
@@ -2139,8 +2254,28 @@ public class PageReplacementPanel extends JPanel {
                     g2.drawRoundRect(tagX, 36, tagW, 18, 6, 6);
                     g2.drawString(flashTag, tagX + 8, 49);
                 }
+            }
 
-                sx += slotW + slotGap;
+            // Restore clip so laser beams and bottom console banner draw completely unclipped
+            g2.setClip(prevClip);
+
+            // Draw subtle scroll helper badges when there are more pipes to scroll through
+            if (maxScroll > 0) {
+                g2.setFont(new Font("Consolas", Font.BOLD, 9));
+                if (pipeScrollX > 6) {
+                    g2.setColor(new Color(15, 10, 28, 230));
+                    g2.fillRoundRect(startSlotX + 4, slotY + 4, 76, 18, 4, 4);
+                    g2.setColor(RetroTheme.ACCENT_CYAN);
+                    g2.drawRoundRect(startSlotX + 4, slotY + 4, 76, 18, 4, 4);
+                    g2.drawString("◄ PREV PIPES", startSlotX + 8, slotY + 16);
+                }
+                if (pipeScrollX < maxScroll - 6) {
+                    g2.setColor(new Color(15, 10, 28, 230));
+                    g2.fillRoundRect(endSlotX - 80, slotY + 4, 76, 18, 4, 4);
+                    g2.setColor(RetroTheme.ACCENT_CYAN);
+                    g2.drawRoundRect(endSlotX - 80, slotY + 4, 76, 18, 4, 4);
+                    g2.drawString("MORE PIPES ►", endSlotX - 74, slotY + 16);
+                }
             }
 
             // =================================================================

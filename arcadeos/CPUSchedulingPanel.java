@@ -388,34 +388,9 @@ public class CPUSchedulingPanel extends JPanel {
         scrollInput.setAlignmentX(Component.LEFT_ALIGNMENT);
         deck.add(scrollInput);
 
-        deck.add(Box.createVerticalStrut(5));
+        deck.add(Box.createVerticalStrut(6));
 
-        // 6. DEDICATED ARCADE GAME CABINET LAUNCHER (Replaces Benchmarks)
-        JPanel gameCard = new JPanel(new BorderLayout(0, 3));
-        gameCard.setOpaque(false);
-        gameCard.setMaximumSize(new Dimension(800, 52));
-        gameCard.setAlignmentX(Component.LEFT_ALIGNMENT);
-
-        JLabel gameTitle = new JLabel("RETRO ARCADE CABINET // 16-BIT MINIGAME");
-        gameTitle.setFont(new Font("Consolas", Font.BOLD, 10));
-        gameTitle.setForeground(RetroTheme.ACCENT_PINK);
-        gameCard.add(gameTitle, BorderLayout.NORTH);
-
-        JButton btnLaunchArcade = createArcadeButton("PLAY KERNEL TAPPER // 3-LANE ARCADE", new Color(110, 32, 140), Color.WHITE, 32);
-        btnLaunchArcade.setIcon(RetroIcons.createPlayIcon(12, Color.WHITE));
-        btnLaunchArcade.setFont(new Font("Consolas", Font.BOLD, 11));
-        btnLaunchArcade.setToolTipText("Launch 16-bit 4-lane retro arcade game (Control dispatcher with Arrow Keys & Spacebar!)");
-        btnLaunchArcade.addActionListener(e -> {
-            JFrame topFrame = (JFrame) SwingUtilities.getWindowAncestor(this);
-            KernelTapperDialog dlg = new KernelTapperDialog(topFrame, selectedAlgo, new ArrayList<>(currentJobsList));
-            dlg.setVisible(true);
-        });
-        gameCard.add(btnLaunchArcade, BorderLayout.CENTER);
-        deck.add(gameCard);
-
-        deck.add(Box.createVerticalStrut(5));
-
-        // 7. Algorithm Policy Intel Card (Clear 12pt readable text, 72px height)
+        // 6. Algorithm Policy Intel Card (Clear 12pt readable text, 72px height)
         JPanel intelCard = new JPanel();
         intelCard.setLayout(new BoxLayout(intelCard, BoxLayout.Y_AXIS));
         intelCard.setOpaque(true);
@@ -554,10 +529,12 @@ public class CPUSchedulingPanel extends JPanel {
         p.setLayout(new BoxLayout(p, BoxLayout.Y_AXIS));
         p.setBorder(BorderFactory.createEmptyBorder(0, 6, 0, 4));
 
-        // Top Status Strip
+        // Top Status Strip & Top-Right Arcade Minigame Launcher
         JPanel header = new JPanel(new BorderLayout());
         header.setOpaque(false);
-        header.setMaximumSize(new Dimension(1400, 24));
+        header.setPreferredSize(new Dimension(1400, 26));
+        header.setMaximumSize(new Dimension(1400, 26));
+        header.setMinimumSize(new Dimension(100, 26));
         header.setAlignmentX(Component.LEFT_ALIGNMENT);
 
         lblMissionStatus = new JLabel("LIVE OUTPUT // DEFENSE TURRET & CREEP LANE");
@@ -566,11 +543,19 @@ public class CPUSchedulingPanel extends JPanel {
         lblMissionStatus.setBorder(BorderFactory.createEmptyBorder(0, 4, 0, 0));
         header.add(lblMissionStatus, BorderLayout.WEST);
 
-        JLabel pill = new JLabel(" [ STATUS: READY // CLICK START ] ");
-        pill.setFont(new Font("Consolas", Font.BOLD, 11));
-        pill.setForeground(RetroTheme.ACCENT_GREEN);
-        pill.setBorder(BorderFactory.createLineBorder(RetroTheme.ACCENT_GREEN, 1));
-        header.add(pill, BorderLayout.EAST);
+        JButton btnPlayArcade = RetroTheme.createRetroButton("PLAY KERNEL TAPPER ARCADE", new Color(48, 20, 65), RetroTheme.ACCENT_YELLOW);
+        btnPlayArcade.setFont(new Font("Consolas", Font.BOLD, 10));
+        btnPlayArcade.setIcon(new ImageIcon(PixelSprites.createAlienSprite(14, RetroTheme.ACCENT_YELLOW)));
+        btnPlayArcade.setIconTextGap(6);
+        btnPlayArcade.setPreferredSize(new Dimension(205, 24));
+        btnPlayArcade.setMaximumSize(new Dimension(205, 24));
+        btnPlayArcade.setToolTipText("Launch 16-bit 3-lane retro arcade game (Control dispatcher with Arrow Keys & Spacebar!)");
+        btnPlayArcade.addActionListener(e -> {
+            JFrame topFrame = (JFrame) SwingUtilities.getWindowAncestor(this);
+            KernelTapperDialog dlg = new KernelTapperDialog(topFrame, selectedAlgo, new ArrayList<>(currentJobsList));
+            dlg.setVisible(true);
+        });
+        header.add(btnPlayArcade, BorderLayout.EAST);
         p.add(header);
 
         p.add(Box.createVerticalStrut(4));
