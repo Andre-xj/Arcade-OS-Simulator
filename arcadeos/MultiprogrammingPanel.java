@@ -333,19 +333,6 @@ public class MultiprogrammingPanel extends JPanel {
         lblFoodRule.setMaximumSize(new Dimension(800, 16));
         deck.add(lblFoodRule);
 
-        deck.add(Box.createVerticalStrut(4));
-
-        // Standalone Arcade Game Button (User controls the chef directly!)
-        JButton btnLaunchArcade = RetroTheme.createRetroButton("PLAY OVERCOOKED KITCHEN", new Color(38, 20, 60), RetroTheme.ACCENT_YELLOW);
-        btnLaunchArcade.setFont(new Font("Consolas", Font.BOLD, 11));
-        btnLaunchArcade.setIcon(new ImageIcon(PixelSprites.createChefSprite(18, false)));
-        btnLaunchArcade.setIconTextGap(8);
-        btnLaunchArcade.setMaximumSize(new Dimension(800, 32));
-        btnLaunchArcade.setAlignmentX(Component.LEFT_ALIGNMENT);
-        btnLaunchArcade.setToolTipText("Launch standalone playable Overcooked Kitchen arcade game where you control the chef directly!");
-        btnLaunchArcade.addActionListener(e -> launchOvercookedGame());
-        deck.add(btnLaunchArcade);
-
         deck.add(Box.createVerticalStrut(6));
 
         // Section Title: GIVEN TABLE with compact [+] and [-] mini buttons
