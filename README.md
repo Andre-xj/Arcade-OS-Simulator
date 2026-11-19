@@ -1,6 +1,12 @@
 # 🕹️ ARCADE OS // 8-Bit Retro Operating System Simulator
 
-> **Course:** Operating Systems  
+> **Course:** Operating System  
+> **Institution:** University of Makati (UMak) - College of Computing and Information Sciences (CCIS)  
+> **Degree & Section:** Bachelor of Science in Computer Science (BSCS I-BCSAD)  
+> **Development Team:**  
+> - **Bermundo, John Andre**  
+> - **Cosing, Yun-tzu**  
+> - **Manalo, Cyril**  
 > **Project:** Final Operating System Simulator (GUI-Based Application)  
 > **Language:** Java (JDK 17+) — 100% Native Java AWT & Swing (Zero External JAR Dependencies)  
 > **Target OS:** Windows / macOS / Linux  
@@ -216,11 +222,14 @@ ArcadeOS_Modular_Java/
 │   ├── ArcadeOS.java            # Main Application Window & Navigation Router
 │   ├── AppState.java            # Session State, Scores, and Progress Persistence
 │   ├── LoginPanel.java          # User Authentication & Operator Mode Screen
-│   ├── MainMenuPanel.java       # Main Navigation Hub
+│   ├── MainMenuPanel.java       # Main Navigation Hub & Engineering Dossier
 │   ├── ArchivesPanel.java       # Stage Select & System Dossier Carousel
 │   ├── SimulatorContainerPanel.java # Unified Mission Cartridge Tab System
 │   ├── SystemInitPanel.java     # BIOS POST Boot Sequence
-│   ├── QuizPanel.java           # Interactive OS Concept Mastery Arena
+│   ├── QuizStageSelectPanel.java # Algorithm Quiz Arena: 8-Cartridge Mission Select Hub
+│   ├── QuizDifficultyPanel.java  # Security Clearance Gate: Easy / Average / Expert Tiers
+│   ├── QuizManager.java         # Procedural OS Algorithm Generator & Telemetry Engine
+│   ├── QuizPanel.java           # Interactive OS Algorithm Battle Arena & Dual-Pane Worksheet
 │   │
 │   ├── CPUSchedulingPanel.java  # Mission 01: CPU Scheduling Simulator
 │   ├── BankersPanel.java        # Mission 02: Banker's Algorithm & Deadlock Avoidance
@@ -249,4 +258,10 @@ ArcadeOS_Modular_Java/
 
 ---
 
-*Authored for the Operating Systems Simulator Final Project Defense.*
+## 👨‍💻 Engineering Team (BSCS I-BCSAD)
+- **Bermundo, John Andre**
+- **Cosing, Yun-tzu**
+- **Manalo, Cyril**
+
+*College of Computing and Information Sciences (CCIS) — University of Makati (UMak)*  
+*Operating System Final Project Defense.*

@@ -819,7 +819,7 @@ public class MainMenuPanel extends JPanel {
         if (index == 0) {
             parentFrame.showScreen(ArcadeOS.SCREEN_ARCHIVES);
         } else if (index == 1) {
-            parentFrame.showScreen(ArcadeOS.SCREEN_QUIZ);
+            parentFrame.showScreen(ArcadeOS.SCREEN_QUIZ_STAGE_SELECT);
         } else if (index == 2) {
             showAboutSystemDialog();
         } else if (index == 3) {
@@ -840,59 +840,281 @@ public class MainMenuPanel extends JPanel {
 
     private void showAboutSystemDialog() {
         JDialog dialog = new JDialog(parentFrame, "MINI // OS - SYSTEM ARCHITECTURE & CREDITS", true);
-        dialog.setLayout(new BorderLayout(0, 15));
+        dialog.setLayout(new BorderLayout());
         dialog.getContentPane().setBackground(RetroTheme.BG_DARK);
-        dialog.setSize(620, 540);
+        dialog.setSize(800, 680);
+        dialog.setResizable(false);
         dialog.setLocationRelativeTo(this);
 
-        JPanel pnl = new JPanel();
-        pnl.setOpaque(false);
-        pnl.setLayout(new BoxLayout(pnl, BoxLayout.Y_AXIS));
-        pnl.setBorder(BorderFactory.createEmptyBorder(20, 24, 20, 24));
+        JPanel root = new JPanel() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                super.paintComponent(g);
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                // Dark synthwave gradient background
+                GradientPaint gp = new GradientPaint(
+                        0, 0, new Color(14, 10, 28),
+                        0, getHeight(), new Color(6, 4, 14)
+                );
+                g2.setPaint(gp);
+                g2.fillRect(0, 0, getWidth(), getHeight());
 
-        JLabel titleLbl = new JLabel("◆ MINI // OS SYSTEM ARCHITECTURE & CREDITS ◆");
-        titleLbl.setFont(new Font("Consolas", Font.BOLD, 15));
-        titleLbl.setForeground(RetroTheme.ACCENT_PINK);
-        titleLbl.setAlignmentX(Component.LEFT_ALIGNMENT);
-        pnl.add(titleLbl);
-        pnl.add(Box.createVerticalStrut(16));
+                // Subtle grid lines
+                g2.setColor(new Color(255, 255, 255, 6));
+                for (int x = 0; x < getWidth(); x += 32) {
+                    g2.drawLine(x, 0, x, getHeight());
+                }
+                for (int y = 0; y < getHeight(); y += 32) {
+                    g2.drawLine(0, y, getWidth(), y);
+                }
 
-        JTextArea infoText = new JTextArea();
-        infoText.setEditable(false);
-        infoText.setFont(new Font("Consolas", Font.PLAIN, 12));
-        infoText.setBackground(RetroTheme.CARD_BG);
-        infoText.setForeground(new Color(230, 230, 245));
-        infoText.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(new Color(255, 255, 255, 25), 1),
-                BorderFactory.createEmptyBorder(12, 14, 12, 14)
+                // Outer border glow
+                g2.setColor(new Color(180, 0, 255, 80));
+                g2.drawRect(0, 0, getWidth() - 1, getHeight() - 1);
+                g2.setColor(new Color(5, 217, 232, 60));
+                g2.drawRect(1, 1, getWidth() - 3, getHeight() - 3);
+
+                g2.dispose();
+            }
+        };
+        root.setLayout(new BorderLayout(0, 10));
+        root.setBorder(BorderFactory.createEmptyBorder(12, 16, 12, 16));
+
+        // 1. TOP HEADER BANNER
+        JPanel headerPanel = new JPanel() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(new Color(24, 16, 46));
+                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 10, 10);
+                GradientPaint gp = new GradientPaint(0, 0, RetroTheme.ACCENT_PINK, getWidth(), 0, RetroTheme.ACCENT_CYAN);
+                g2.setPaint(gp);
+                g2.fillRect(0, 0, getWidth(), 3);
+                g2.setColor(new Color(80, 55, 120, 160));
+                g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 10, 10);
+                g2.dispose();
+                super.paintComponent(g);
+            }
+        };
+        headerPanel.setOpaque(false);
+        headerPanel.setLayout(new BorderLayout(14, 0));
+        headerPanel.setBorder(BorderFactory.createEmptyBorder(8, 14, 8, 14));
+
+        // Left Header: Mascot + Title stack
+        JPanel leftHeader = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 0));
+        leftHeader.setOpaque(false);
+
+        JLabel mascotLbl = new JLabel(new ImageIcon(PixelSprites.createRobotSprite(32)));
+        mascotLbl.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(RetroTheme.ACCENT_PINK, 1),
+                BorderFactory.createEmptyBorder(2, 2, 2, 2)
         ));
-        infoText.setText(
-            "[ INSTITUTION & COURSE ]\n" +
-            "  University : University of Makati (UMak) - CCIS\n" +
-            "  Course     : Operating Systems (BSCS I-BCSAD)\n" +
-            "  Academic Yr: 2026\n\n" +
-            "[ TECH STACK & ARCHITECTURE ]\n" +
-            "  Architecture : Modular Object-Oriented Programming (Java / OOP)\n" +
-            "  UI Engine    : Custom Java2D Synthwave & 8-Bit Retro Arcade Engine\n" +
-            "  Key Features : 8 OS Subsystem Simulators, Live Gantt Runways,\n" +
-            "                 Multi-Module Interactive Quiz Arena, Dynamic Leaderboards\n\n" +
-            "[ MODULE ENGINEERING CREDITS ]\n" +
-            "  Lead Architect  : John Andre (BSCS I-BCSAD)\n" +
-            "  Subsystems 01-04: CPU Scheduling, Banker's, Paging, Page Replacement\n" +
-            "  Subsystems 05-08: Segmentation, Dynamic Partitioning, Disk, Multiprogramming\n" +
-            "  Special Thanks  : Insuu & UMak CCIS OS Faculty"
-        );
-        infoText.setAlignmentX(Component.LEFT_ALIGNMENT);
-        pnl.add(infoText);
-        pnl.add(Box.createVerticalStrut(18));
+        leftHeader.add(mascotLbl);
 
-        JButton btnClose = RetroTheme.createRetroButton("RETURN TO MAIN MENU", RetroTheme.BTN_DARK, RetroTheme.ACCENT_CYAN);
-        btnClose.setAlignmentX(Component.CENTER_ALIGNMENT);
+        JPanel titleStack = new JPanel();
+        titleStack.setLayout(new BoxLayout(titleStack, BoxLayout.Y_AXIS));
+        titleStack.setOpaque(false);
+
+        JLabel sysTag = new JLabel("MINI // OS ARCHITECTURE & SYSTEM DOSSIER");
+        sysTag.setFont(new Font("Consolas", Font.BOLD, 14));
+        sysTag.setForeground(RetroTheme.ACCENT_YELLOW);
+
+        JLabel subTag = new JLabel("COLLEGE OF COMPUTING AND INFORMATION SCIENCES • UNIVERSITY OF MAKATI");
+        subTag.setFont(new Font("Consolas", Font.BOLD, 9));
+        subTag.setForeground(RetroTheme.ACCENT_CYAN);
+
+        titleStack.add(sysTag);
+        titleStack.add(Box.createVerticalStrut(3));
+        titleStack.add(subTag);
+        leftHeader.add(titleStack);
+
+        headerPanel.add(leftHeader, BorderLayout.WEST);
+
+        // Right Header: Status Pill
+        JPanel rightHeader = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 4));
+        rightHeader.setOpaque(false);
+        JLabel buildBadge = new JLabel(" BUILD: 2026.1  |  ONLINE ● ");
+        buildBadge.setFont(new Font("Consolas", Font.BOLD, 10));
+        buildBadge.setForeground(RetroTheme.ACCENT_GREEN);
+        buildBadge.setOpaque(true);
+        buildBadge.setBackground(new Color(12, 38, 22));
+        buildBadge.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(57, 255, 20, 140), 1),
+                BorderFactory.createEmptyBorder(4, 8, 4, 8)
+        ));
+        rightHeader.add(buildBadge);
+        headerPanel.add(rightHeader, BorderLayout.EAST);
+
+        root.add(headerPanel, BorderLayout.NORTH);
+
+        // 2. CENTER CONTENT (CARDS)
+        JPanel centerCards = new JPanel();
+        centerCards.setOpaque(false);
+        centerCards.setLayout(new BoxLayout(centerCards, BoxLayout.Y_AXIS));
+
+        // CARD 1: INSTITUTION & COURSE
+        centerCards.add(createCreditsCard(
+                "INSTITUTION & ACADEMIC DOSSIER",
+                RetroTheme.ACCENT_CYAN,
+                new String[][]{
+                        {"UNIVERSITY", "University of Makati (UMak) - CCIS"},
+                        {"COLLEGE", "College of Computing and Information Sciences"},
+                        {"DEGREE & SECTION", "Bachelor of Science in Computer Science (BSCS I-BCSAD)"},
+                        {"COURSE SUBJECT", "Operating System"}
+                }
+        ));
+        centerCards.add(Box.createVerticalStrut(6));
+
+        // CARD 2: TECH STACK & ENGINE ARCHITECTURE
+        centerCards.add(createCreditsCard(
+                "TECH STACK & ENGINE ARCHITECTURE",
+                RetroTheme.ACCENT_PURPLE,
+                new String[][]{
+                        {"CORE PLATFORM", "Modular Object-Oriented Programming (Java / OOP)"},
+                        {"GRAPHICS ENGINE", "Custom Java2D Synthwave Canvas & 8-Bit Retro Sprite Renderer"},
+                        {"SIMULATORS (8)", "CPU Gantt, Banker's Vault, MMU Paging, Mario Cache,"},
+                        {"", "Cyber Snake, Crane Defrag, Pac-Man Disk, Overcooked"},
+                        {"INTERACTIVE DRILLS", "Fill-in-the-Blank Worksheets, Multiple Choice Arena,"},
+                        {"", "Dynamic Hall of Fame Leaderboard & Real-Time XP Tracking"}
+                }
+        ));
+        centerCards.add(Box.createVerticalStrut(6));
+
+        // CARD 3: MODULE ENGINEERING & CREDITS
+        centerCards.add(createCreditsCard(
+                "MODULE ENGINEERING & DEVELOPMENT TEAM",
+                RetroTheme.ACCENT_YELLOW,
+                new String[][]{
+                        {"PROGRAMMERS", "Bermundo, John Andre"},
+                        {"", "Cosing, Yun-tzu"},
+                        {"", "Manalo, Cyril"},
+                        {"SUBSYSTEMS 01-04", "CPU Scheduling, Banker's Avoidance, Paging MMU, Cache Replacement"},
+                        {"SUBSYSTEMS 05-08", "Memory Segmentation, Dynamic Partitioning, Disk Seek, Multiprogramming"},
+                        {"SPECIAL THANKS", "Insuu & UMak CCIS Operating Systems Faculty"}
+                }
+        ));
+
+        root.add(centerCards, BorderLayout.CENTER);
+
+        // 3. BOTTOM FOOTER & ACTION BAR
+        JPanel footerPanel = new JPanel(new BorderLayout(12, 0));
+        footerPanel.setOpaque(false);
+        footerPanel.setBorder(BorderFactory.createEmptyBorder(6, 4, 4, 4));
+
+        // Mini Specs Tag Strip
+        JPanel specsStrip = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
+        specsStrip.setOpaque(false);
+        specsStrip.add(createCreditsTagPill("SYS: OK", new Color(57, 255, 20)));
+        specsStrip.add(createCreditsTagPill("UI: SYNTHWAVE", RetroTheme.ACCENT_CYAN));
+        specsStrip.add(createCreditsTagPill("MODULES: 08/08 ONLINE", RetroTheme.ACCENT_YELLOW));
+        footerPanel.add(specsStrip, BorderLayout.WEST);
+
+        // Action Button
+        JButton btnClose = RetroTheme.createRetroButton("◀  RETURN TO MAIN MENU", RetroTheme.BTN_DARK, RetroTheme.ACCENT_CYAN);
+        btnClose.setFont(new Font("Consolas", Font.BOLD, 12));
+        btnClose.setPreferredSize(new Dimension(220, 36));
         btnClose.addActionListener(e -> dialog.dispose());
-        pnl.add(btnClose);
+        footerPanel.add(btnClose, BorderLayout.EAST);
 
-        dialog.add(pnl, BorderLayout.CENTER);
+        root.add(footerPanel, BorderLayout.SOUTH);
+
+        dialog.add(root);
         dialog.setVisible(true);
+    }
+
+    private JPanel createCreditsCard(String title, Color accentColor, String[][] fields) {
+        JPanel card = new JPanel() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(new Color(22, 16, 42, 230));
+                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 8, 8);
+                g2.setColor(accentColor);
+                g2.fillRoundRect(0, 0, 4, getHeight(), 4, 4);
+                g2.setColor(new Color(accentColor.getRed(), accentColor.getGreen(), accentColor.getBlue(), 65));
+                g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 8, 8);
+                g2.dispose();
+                super.paintComponent(g);
+            }
+        };
+        card.setOpaque(false);
+        card.setLayout(new BorderLayout(0, 6));
+        card.setBorder(BorderFactory.createEmptyBorder(8, 14, 8, 14));
+
+        JPanel cardHeader = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
+        cardHeader.setOpaque(false);
+        JLabel iconLbl = new JLabel("◆");
+        iconLbl.setFont(new Font("Consolas", Font.BOLD, 11));
+        iconLbl.setForeground(accentColor);
+        cardHeader.add(iconLbl);
+
+        JLabel titleLbl = new JLabel(title);
+        titleLbl.setFont(new Font("Consolas", Font.BOLD, 11));
+        titleLbl.setForeground(accentColor);
+        cardHeader.add(titleLbl);
+        card.add(cardHeader, BorderLayout.NORTH);
+
+        JPanel rowsPanel = new JPanel();
+        rowsPanel.setLayout(new BoxLayout(rowsPanel, BoxLayout.Y_AXIS));
+        rowsPanel.setOpaque(false);
+
+        for (String[] row : fields) {
+            JPanel rowPnl = new JPanel(new BorderLayout(12, 0));
+            rowPnl.setOpaque(false);
+            rowPnl.setBorder(BorderFactory.createEmptyBorder(1, 6, 1, 6));
+
+            if (row[0].isEmpty()) {
+                JLabel spacer = new JLabel();
+                spacer.setPreferredSize(new Dimension(165, 18));
+                rowPnl.add(spacer, BorderLayout.WEST);
+
+                JLabel valLbl = new JLabel(row[1]);
+                valLbl.setFont(new Font("Consolas", Font.PLAIN, 11));
+                if (row[1].contains("Cosing") || row[1].contains("Manalo") || row[1].contains("Bermundo")) {
+                    valLbl.setForeground(Color.WHITE);
+                    valLbl.setFont(new Font("Consolas", Font.BOLD, 11));
+                } else {
+                    valLbl.setForeground(new Color(205, 205, 230));
+                }
+                rowPnl.add(valLbl, BorderLayout.CENTER);
+            } else {
+                JLabel keyLbl = new JLabel(row[0] + " :");
+                keyLbl.setFont(new Font("Consolas", Font.BOLD, 11));
+                keyLbl.setForeground(new Color(150, 145, 185));
+                keyLbl.setPreferredSize(new Dimension(165, 18));
+                rowPnl.add(keyLbl, BorderLayout.WEST);
+
+                JLabel valLbl = new JLabel(row[1]);
+                valLbl.setFont(new Font("Consolas", Font.PLAIN, 11));
+                if (row[0].contains("PROGRAMMER") || row[0].contains("DEGREE") || row[1].contains("Bermundo")) {
+                    valLbl.setForeground(Color.WHITE);
+                    valLbl.setFont(new Font("Consolas", Font.BOLD, 11));
+                } else {
+                    valLbl.setForeground(new Color(220, 220, 240));
+                }
+                rowPnl.add(valLbl, BorderLayout.CENTER);
+            }
+            rowsPanel.add(rowPnl);
+        }
+        card.add(rowsPanel, BorderLayout.CENTER);
+
+        return card;
+    }
+
+    private JLabel createCreditsTagPill(String text, Color col) {
+        JLabel lbl = new JLabel(text);
+        lbl.setFont(new Font("Consolas", Font.BOLD, 9));
+        lbl.setForeground(col);
+        lbl.setOpaque(true);
+        lbl.setBackground(new Color(col.getRed(), col.getGreen(), col.getBlue(), 25));
+        lbl.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(col.getRed(), col.getGreen(), col.getBlue(), 90), 1),
+                BorderFactory.createEmptyBorder(2, 6, 2, 6)
+        ));
+        return lbl;
     }
 
     private void showLeaderboard() {
