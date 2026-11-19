@@ -186,8 +186,6 @@ public class MultiprogrammingPanel extends JPanel {
     private DefaultTableModel givenTableModel;
     private JTable givenTable;
     private String selectedCategory = "CLASS 7.4";
-    private JButton btnCatClass, btnCatExcel, btnCatRush;
-    private JLabel lblCategoryRule;
     private boolean isUpdatingTable = false;
     private JButton btnAddJob, btnRemoveJob;
     private JButton btnPlay, btnStep, btnReset, btnSpeed;
@@ -284,44 +282,7 @@ public class MultiprogrammingPanel extends JPanel {
         header.add(titleBox);
         deck.add(header);
 
-        deck.add(Box.createVerticalStrut(6));
-
-        // 2. Category / Scenario Selector (Matches Invaders, Pac-Man, Mario standard)
-        JPanel catCard = new JPanel(new BorderLayout(0, 3));
-        catCard.setOpaque(false);
-        catCard.setMaximumSize(new Dimension(800, 52));
-        catCard.setAlignmentX(Component.LEFT_ALIGNMENT);
-
-        JLabel lblCatTitle = new JLabel("CONCURRENCY SCENARIO // CATEGORY");
-        lblCatTitle.setFont(new Font("Consolas", Font.BOLD, 10));
-        lblCatTitle.setForeground(RetroTheme.ACCENT_CYAN);
-        catCard.add(lblCatTitle, BorderLayout.NORTH);
-
-        JPanel catGrid = new JPanel(new GridLayout(1, 3, 4, 0));
-        catGrid.setOpaque(false);
-
-        btnCatClass = createCategoryBtn("CLASS 7.4");
-        btnCatExcel = createCategoryBtn("EXCEL 10.0");
-        btnCatRush = createCategoryBtn("LUNCH RUSH");
-
-        btnCatClass.addActionListener(e -> loadClassSlidePreset());
-        btnCatExcel.addActionListener(e -> loadExcelSlidePreset());
-        btnCatRush.addActionListener(e -> loadLunchRushPreset());
-
-        catGrid.add(btnCatClass);
-        catGrid.add(btnCatExcel);
-        catGrid.add(btnCatRush);
-        catCard.add(catGrid, BorderLayout.CENTER);
-        deck.add(catCard);
-
-        deck.add(Box.createVerticalStrut(4));
-
-        lblCategoryRule = new JLabel("CLASS 7.4: Standard classroom problem set (T=7.40 to 9.10).");
-        lblCategoryRule.setFont(new Font("Consolas", Font.ITALIC, 9));
-        lblCategoryRule.setForeground(new Color(210, 220, 240));
-        lblCategoryRule.setAlignmentX(Component.LEFT_ALIGNMENT);
-        lblCategoryRule.setMaximumSize(new Dimension(800, 16));
-        deck.add(lblCategoryRule);
+        deck.add(Box.createVerticalStrut(8));
 
         JLabel lblFoodRule = new JLabel("🍳 FOOD MAP: Fast jobs = Sushi/Burger • Longest job = Sizzling Steak!");
         lblFoodRule.setFont(new Font("Consolas", Font.BOLD, 9));
@@ -826,32 +787,8 @@ public class MultiprogrammingPanel extends JPanel {
     // =========================================================================
     // 3. CATEGORIES, PRESETS & INPUT MANAGEMENT
     // =========================================================================
-    private JButton createCategoryBtn(String name) {
-        JButton b = CPUSchedulingPanel.createArcadeButton(name, new Color(38, 25, 68), new Color(180, 180, 210), 24);
-        b.setFont(new Font("Consolas", Font.BOLD, 10));
-        return b;
-    }
-
     private void updateCategoryButtons(String cat) {
         this.selectedCategory = cat;
-        updateCatBtn(btnCatClass, "CLASS 7.4".equals(cat));
-        updateCatBtn(btnCatExcel, "EXCEL 10.0".equals(cat));
-        updateCatBtn(btnCatRush, "LUNCH RUSH".equals(cat));
-        if (lblCategoryRule != null) {
-            if ("CLASS 7.4".equals(cat)) {
-                lblCategoryRule.setText("CLASS 7.4: Standard classroom problem set (T=7.40 to 9.10).");
-            } else if ("EXCEL 10.0".equals(cat)) {
-                lblCategoryRule.setText("EXCEL 10.0: Classroom problem set 2 with simultaneous finish (T=10.00 to 11.40).");
-            } else if ("LUNCH RUSH".equals(cat)) {
-                lblCategoryRule.setText("LUNCH RUSH: High concurrency fast orders kitchen rush challenge.");
-            }
-        }
-    }
-
-    private void updateCatBtn(JButton b, boolean active) {
-        if (b == null) return;
-        b.setBackground(active ? RetroTheme.ACCENT_PINK : new Color(38, 25, 68));
-        b.setForeground(active ? Color.WHITE : new Color(180, 180, 210));
     }
 
     public void loadClassSlidePreset() {
