@@ -1277,6 +1277,7 @@ public class DiskSchedulingPanel extends JPanel {
         if (b == null) return;
         b.setBackground(active ? new Color(0, 140, 200) : new Color(38, 25, 68));
         b.setForeground(active ? Color.WHITE : new Color(180, 180, 210));
+        b.repaint();
     }
 
     public void loadRequestString(String str) {

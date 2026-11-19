@@ -308,11 +308,22 @@ public class CPUSchedulingPanel extends JPanel {
         btnRemoveJob.setToolTipText("Delete selected job or last job in queue");
         btnRemoveJob.addActionListener(e -> {
             int sel = inputTable.getSelectedRow();
-            if (sel >= 0 && inputModel.getRowCount() > 1) {
+            if (sel >= 0 && sel < inputModel.getRowCount()) {
                 inputModel.removeRow(sel);
                 recomputeAll();
-            } else if (inputModel.getRowCount() > 1) {
+            } else if (inputModel.getRowCount() > 0) {
                 inputModel.removeRow(inputModel.getRowCount() - 1);
+                recomputeAll();
+            }
+        });
+
+        JButton btnClearAll = createArcadeButton("CLR", new Color(110, 25, 45), Color.WHITE, 24);
+        btnClearAll.setIcon(RetroIcons.createDeleteIcon(11, Color.WHITE));
+        btnClearAll.setFont(new Font("Consolas", Font.BOLD, 10));
+        btnClearAll.setToolTipText("Clear all jobs from queue");
+        btnClearAll.addActionListener(e -> {
+            if (inputModel.getRowCount() > 0) {
+                inputModel.setRowCount(0);
                 recomputeAll();
             }
         });
@@ -324,6 +335,7 @@ public class CPUSchedulingPanel extends JPanel {
 
         qRight.add(btnAddJob);
         qRight.add(btnRemoveJob);
+        qRight.add(btnClearAll);
         qRight.add(btnCsv);
         queueHeader.add(qRight, BorderLayout.EAST);
         deck.add(queueHeader);
@@ -551,6 +563,10 @@ public class CPUSchedulingPanel extends JPanel {
         btnPlayArcade.setMaximumSize(new Dimension(205, 24));
         btnPlayArcade.setToolTipText("Launch 16-bit 3-lane retro arcade game (Control dispatcher with Arrow Keys & Spacebar!)");
         btnPlayArcade.addActionListener(e -> {
+            if (currentJobsList.isEmpty()) {
+                JOptionPane.showMessageDialog(this, "Job queue is empty. Click [+ ADD] to add processes before launching Kernel Tapper Arcade.", "Queue Empty", JOptionPane.INFORMATION_MESSAGE);
+                return;
+            }
             JFrame topFrame = (JFrame) SwingUtilities.getWindowAncestor(this);
             KernelTapperDialog dlg = new KernelTapperDialog(topFrame, selectedAlgo, new ArrayList<>(currentJobsList));
             dlg.setVisible(true);
@@ -736,8 +752,12 @@ public class CPUSchedulingPanel extends JPanel {
         JButton btn = new JButton(text) {
             private boolean isHovered = false;
             private boolean isPressed = false;
+            private Color liveBaseColor = baseColor;
+            private Color liveTextColor = textColor;
 
             {
+                setBackground(baseColor);
+                setForeground(textColor);
                 addMouseListener(new MouseAdapter() {
                     @Override public void mouseEntered(MouseEvent e) { isHovered = true; repaint(); }
                     @Override public void mouseExited(MouseEvent e) { isHovered = false; isPressed = false; repaint(); }
@@ -751,6 +771,20 @@ public class CPUSchedulingPanel extends JPanel {
             }
 
             @Override
+            public void setBackground(Color bg) {
+                super.setBackground(bg);
+                this.liveBaseColor = bg;
+                repaint();
+            }
+
+            @Override
+            public void setForeground(Color fg) {
+                super.setForeground(fg);
+                this.liveTextColor = fg;
+                repaint();
+            }
+
+            @Override
             protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
@@ -759,7 +793,9 @@ public class CPUSchedulingPanel extends JPanel {
                 int w = getWidth();
                 int h = getHeight();
 
-                Color bg = baseColor;
+                Color bg = liveBaseColor != null ? liveBaseColor : getBackground();
+                if (bg == null) bg = new Color(38, 25, 68);
+
                 if (isPressed) {
                     bg = bg.darker();
                 } else if (isHovered) {
@@ -788,14 +824,22 @@ public class CPUSchedulingPanel extends JPanel {
                 g2.setColor(new Color(0, 0, 0, 90));
                 g2.drawLine(3, yOff + bH - 1, w - 4, yOff + bH - 1);
 
-                // 5. Outer Bevel Border
-                g2.setColor(new Color(255, 255, 255, 45));
-                g2.drawRoundRect(0, yOff, w - 1, bH - 1, 6, 6);
+                // 5. Outer Bevel Border - High contrast glowing border when active
+                boolean isBright = (bg.getRed() + bg.getGreen() + bg.getBlue()) > 240;
+                if (isBright) {
+                    g2.setColor(new Color(0, 240, 255));
+                    g2.setStroke(new BasicStroke(1.8f));
+                    g2.drawRoundRect(0, yOff, w - 1, bH - 1, 6, 6);
+                } else {
+                    g2.setColor(new Color(255, 255, 255, 45));
+                    g2.setStroke(new BasicStroke(1.0f));
+                    g2.drawRoundRect(0, yOff, w - 1, bH - 1, 6, 6);
+                }
 
                 // Visible focus state (Accessibility requirement)
-                if (hasFocus()) {
+                if (hasFocus() && !isBright) {
                     g2.setColor(RetroTheme.ACCENT_CYAN);
-                    g2.setStroke(new BasicStroke(2.0f));
+                    g2.setStroke(new BasicStroke(1.5f));
                     g2.drawRoundRect(1, yOff + 1, w - 3, bH - 3, 6, 6);
                 }
 
@@ -824,7 +868,8 @@ public class CPUSchedulingPanel extends JPanel {
                     g2.setColor(new Color(0, 0, 0, 180));
                     g2.drawString(text, tx + 1, ty + 1);
 
-                    g2.setColor(textColor != null ? textColor : Color.WHITE);
+                    Color fg = liveTextColor != null ? liveTextColor : (getForeground() != null ? getForeground() : Color.WHITE);
+                    g2.setColor(fg);
                     g2.drawString(text, tx, ty);
                 }
 
@@ -940,8 +985,12 @@ public class CPUSchedulingPanel extends JPanel {
 
     public void openComparisonArena() {
         pauseSimulation();
-        JFrame topFrame = (JFrame) SwingUtilities.getWindowAncestor(this);
         List<SimJob> currentJobs = getJobsFromTable();
+        if (currentJobs.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Job queue is empty. Click [+ ADD] to insert processes first.", "Queue Empty", JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+        JFrame topFrame = (JFrame) SwingUtilities.getWindowAncestor(this);
         CPUComparisonDialog dlg = new CPUComparisonDialog(topFrame, currentJobs, timeQuantum);
         dlg.setVisible(true);
     }
@@ -1148,6 +1197,10 @@ public class CPUSchedulingPanel extends JPanel {
     }
 
     private void startSimulation() {
+        if (inputModel.getRowCount() == 0) {
+            JOptionPane.showMessageDialog(this, "Job queue is empty. Click [+ ADD] to insert processes first.", "Queue Empty", JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
         if (fullGanttSlots.isEmpty()) runSimulationMath();
         if (currentSimTime >= maxSimTime) currentSimTime = 0.0;
         isPlaying = true;
@@ -1179,6 +1232,10 @@ public class CPUSchedulingPanel extends JPanel {
     }
 
     private void stepSimulationForward() {
+        if (inputModel.getRowCount() == 0) {
+            JOptionPane.showMessageDialog(this, "Job queue is empty. Click [+ ADD] to insert processes first.", "Queue Empty", JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
         pauseSimulation();
         if (fullGanttSlots.isEmpty()) runSimulationMath();
         if (currentSimTime >= maxSimTime) {
@@ -1207,7 +1264,32 @@ public class CPUSchedulingPanel extends JPanel {
 
     private void runSimulationMath() {
         List<SimJob> jobs = getJobsFromTable();
-        if (jobs.isEmpty()) return;
+        if (jobs.isEmpty()) {
+            fullGanttSlots.clear();
+            fullResultsList.clear();
+            currentJobsList.clear();
+            ganttTableModel.setRowCount(0);
+            maxSimTime = 0.0;
+            currentSimTime = 0.0;
+            if (lblCpuClearance != null) {
+                lblCpuClearance.setText("0% CLEAR (0/0)");
+                lblCpuClearance.setForeground(RetroTheme.ACCENT_YELLOW);
+            }
+            if (lblAvgWt != null) lblAvgWt.setText("~0.00 s");
+            if (lblAvgTat != null) lblAvgTat.setText("~0.00 s");
+            if (sub1 != null) sub1.setText("NO JOBS IN QUEUE");
+            if (sub2 != null) sub2.setText("NO JOBS IN QUEUE");
+            if (sub3 != null) sub3.setText("STANDBY (0/0)");
+            if (ganttCanvas != null) {
+                ganttCanvas.setSimulationState(Collections.emptyList(), 0, 0);
+                ganttCanvas.repaint();
+            }
+            if (runwayCanvas != null) {
+                runwayCanvas.updateState(0, null, Collections.emptyList(), selectedAlgo, timeQuantum, 0);
+                runwayCanvas.repaint();
+            }
+            return;
+        }
 
         List<GanttSlot> gantt = new ArrayList<>();
         List<SimJob> results = new ArrayList<>();
@@ -1371,7 +1453,27 @@ public class CPUSchedulingPanel extends JPanel {
     }
 
     public void updateLiveDisplay(double time) {
-        if (fullGanttSlots.isEmpty()) return;
+        if (fullGanttSlots.isEmpty()) {
+            ganttTableModel.setRowCount(0);
+            if (lblCpuClearance != null) {
+                lblCpuClearance.setText("0% CLEAR (0/0)");
+                lblCpuClearance.setForeground(RetroTheme.ACCENT_YELLOW);
+            }
+            if (lblAvgWt != null) lblAvgWt.setText("~0.00 s");
+            if (lblAvgTat != null) lblAvgTat.setText("~0.00 s");
+            if (sub1 != null) sub1.setText("NO JOBS IN QUEUE");
+            if (sub2 != null) sub2.setText("NO JOBS IN QUEUE");
+            if (sub3 != null) sub3.setText("STANDBY (0/0)");
+            if (ganttCanvas != null) {
+                ganttCanvas.setSimulationState(Collections.emptyList(), 0, 0);
+                ganttCanvas.repaint();
+            }
+            if (runwayCanvas != null) {
+                runwayCanvas.updateState(0, null, Collections.emptyList(), selectedAlgo, timeQuantum, 0);
+                runwayCanvas.repaint();
+            }
+            return;
+        }
 
         GanttSlot activeSlot = null;
         for (GanttSlot s : fullGanttSlots) {

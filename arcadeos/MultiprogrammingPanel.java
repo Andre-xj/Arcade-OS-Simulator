@@ -1095,7 +1095,7 @@ public class MultiprogrammingPanel extends JPanel {
     private void removeSelectedJobRow() {
         int row = givenTable.getSelectedRow();
         if (row < 0 && givenTableModel.getRowCount() > 0) row = givenTableModel.getRowCount() - 1;
-        if (row >= 0 && givenTableModel.getRowCount() > 1) {
+        if (row >= 0 && givenTableModel.getRowCount() > 0) {
             isUpdatingTable = true;
             try {
                 givenTableModel.removeRow(row);
@@ -1131,7 +1131,16 @@ public class MultiprogrammingPanel extends JPanel {
             currentJobList.add(new JobInput(name, at, bt, 0));
         }
 
-        if (currentJobList.isEmpty()) return;
+        if (currentJobList.isEmpty()) {
+            computedSteps.clear();
+            computedSummaries.clear();
+            populateTraceTable();
+            populateSummaryTable(0.0, 0.0);
+            currentStepIndex = 0;
+            updateHuds();
+            if (canvas != null) canvas.repaint();
+            return;
+        }
 
         // Sort by Arrival Time
         currentJobList.sort(Comparator.comparingDouble(j -> j.at));
