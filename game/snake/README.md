@@ -10,8 +10,8 @@
 ### Option 1: Direct CLI Command
 Compile all sources and launch the Arcade OS Simulator:
 ```bash
-javac -cp . arcadeos/*.java game/snake/*.java
-java -cp . arcadeos.Main
+javac -d bin -cp bin arcadeos/*.java game/snake/*.java
+java -cp bin arcadeos.ArcadeOS
 ```
 
 ### Option 2: Main Menu Navigation
