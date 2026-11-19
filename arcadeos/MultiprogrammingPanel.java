@@ -186,7 +186,7 @@ public class MultiprogrammingPanel extends JPanel {
     private DefaultTableModel givenTableModel;
     private JTable givenTable;
     private String selectedCategory = "CLASS 7.4";
-    private JButton btnCatClass, btnCatExcel, btnCatRush, btnCatRandom;
+    private JButton btnCatClass, btnCatExcel, btnCatRush;
     private JLabel lblCategoryRule;
     private boolean isUpdatingTable = false;
     private JButton btnAddJob, btnRemoveJob;
@@ -297,23 +297,20 @@ public class MultiprogrammingPanel extends JPanel {
         lblCatTitle.setForeground(RetroTheme.ACCENT_CYAN);
         catCard.add(lblCatTitle, BorderLayout.NORTH);
 
-        JPanel catGrid = new JPanel(new GridLayout(1, 4, 3, 0));
+        JPanel catGrid = new JPanel(new GridLayout(1, 3, 4, 0));
         catGrid.setOpaque(false);
 
         btnCatClass = createCategoryBtn("CLASS 7.4");
         btnCatExcel = createCategoryBtn("EXCEL 10.0");
         btnCatRush = createCategoryBtn("LUNCH RUSH");
-        btnCatRandom = createCategoryBtn("RANDOM");
 
         btnCatClass.addActionListener(e -> loadClassSlidePreset());
         btnCatExcel.addActionListener(e -> loadExcelSlidePreset());
         btnCatRush.addActionListener(e -> loadLunchRushPreset());
-        btnCatRandom.addActionListener(e -> loadRandomPreset());
 
         catGrid.add(btnCatClass);
         catGrid.add(btnCatExcel);
         catGrid.add(btnCatRush);
-        catGrid.add(btnCatRandom);
         catCard.add(catGrid, BorderLayout.CENTER);
         deck.add(catCard);
 
@@ -840,7 +837,6 @@ public class MultiprogrammingPanel extends JPanel {
         updateCatBtn(btnCatClass, "CLASS 7.4".equals(cat));
         updateCatBtn(btnCatExcel, "EXCEL 10.0".equals(cat));
         updateCatBtn(btnCatRush, "LUNCH RUSH".equals(cat));
-        updateCatBtn(btnCatRandom, "RANDOM".equals(cat));
         if (lblCategoryRule != null) {
             if ("CLASS 7.4".equals(cat)) {
                 lblCategoryRule.setText("CLASS 7.4: Standard classroom problem set (T=7.40 to 9.10).");
@@ -848,8 +844,6 @@ public class MultiprogrammingPanel extends JPanel {
                 lblCategoryRule.setText("EXCEL 10.0: Classroom problem set 2 with simultaneous finish (T=10.00 to 11.40).");
             } else if ("LUNCH RUSH".equals(cat)) {
                 lblCategoryRule.setText("LUNCH RUSH: High concurrency fast orders kitchen rush challenge.");
-            } else if ("RANDOM".equals(cat)) {
-                lblCategoryRule.setText("RANDOM: Dynamically generated arrival & burst times (3 to 6 jobs).");
             }
         }
     }
